@@ -141,10 +141,7 @@
                     loadPlaylist(0);
                 }
                 
-                // UX: Automatically glide over to the Queue so they can see the results!
-                setTimeout(() => {
-                    if (queue) queue.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                }, 300);
+                
 
             } else {
                 alert('No results found for: ' + q);
@@ -208,10 +205,7 @@
                 playTrack(i);
                 queue.classList.remove('open');
                 
-                // UX: Automatically glide back to the center Player!
-                setTimeout(() => {
-                    document.querySelector('.player').scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                }, 100);
+                
             });
             trackList.appendChild(el);
         });
