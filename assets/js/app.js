@@ -29,6 +29,20 @@
         });
     }
 
+    
+    // ─── Mobile Audio Unlock ────────────────────
+    let audioUnlocked = false;
+    document.addEventListener('click', () => {
+        if (audioUnlocked || !playerReady || !ytPlayer) return;
+        audioUnlocked = true;
+        // Unlocks iOS/Safari media engine by playing during a direct gesture
+        ytPlayer.playVideo();
+        setTimeout(() => {
+            // Only pause if a real track hasn't started playing!
+            if (!isPlaying) ytPlayer.pauseVideo();
+        }, 250);
+    });
+
     // ─── Elements ───────────────────────────────
     const playlistNav     = document.getElementById('playlist-nav');
     const trackList       = document.getElementById('track-list');
@@ -135,6 +149,7 @@
         }
         
         searchInput.placeholder = "Search YouTube...";
+        searchInput.blur(); // Hide mobile keyboard
     }
 
     if (btnSearch) {
