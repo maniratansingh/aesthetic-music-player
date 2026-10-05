@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+patch_*.py
+fix_*.py
+add_*.py
+revert_*.py
+check_*.py
+test_*.html
+test_*.js
