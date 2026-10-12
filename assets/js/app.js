@@ -58,20 +58,72 @@
                 const sidebar         = document.getElementById('sidebar');
     const sidebarBackdrop = document.getElementById('sidebar-backdrop');
     const queue           = document.getElementById('queue');
+    const queueCount      = document.getElementById('queue-count');
     const btnMenu         = document.getElementById('btn-menu');
     
     const btnQueueMobile  = document.getElementById('btn-queue-mobile');
     const btnCloseQueue   = document.getElementById('btn-close-queue');
     const mobilePlName    = document.getElementById('mobile-playlist-name');
 
-    // ─── State ──────────────────────────────────
-    let currentPl    = null;
-    let currentIdx   = 0;
-    let isPlaying    = false;
-    let ytPlayer     = null;
-    let playerReady  = false;
-    
+    // ─── Scrubber Elements ───────────────────────
+    const scrubberTrack   = document.getElementById('scrubber-track');
+    const scrubberFill    = document.getElementById('scrubber-fill');
+    const scrubberThumb   = document.getElementById('scrubber-thumb');
+    const timeCurrent     = document.getElementById('time-current');
+    const timeTotal       = document.getElementById('time-total');
 
+    // ─── State ──────────────────────────────────
+    let currentPl         = null;
+    let currentIdx        = 0;
+    let isPlaying         = false;
+    let ytPlayer          = null;
+    let playerReady       = false;
+    let isScrubbing       = false;
+    let progressInterval  = null;
+
+    function formatSec(sec) {
+        if (!sec || isNaN(sec) || sec < 0) return "0:00";
+        const s = Math.floor(sec);
+        const m = Math.floor(s / 60);
+        const rem = s % 60;
+        return `${m}:${rem.toString().padStart(2, '0')}`;
+    }
+
+    function updateProgress(currentTime, duration) {
+        if (isScrubbing) return;
+        if (!scrubberFill || !scrubberThumb) return;
+        if (!duration || duration <= 0) {
+            scrubberFill.style.width = '0%';
+            scrubberThumb.style.left = '0%';
+            if (timeCurrent) timeCurrent.textContent = '0:00';
+            return;
+        }
+        const pct = Math.min(100, Math.max(0, (currentTime / duration) * 100));
+        scrubberFill.style.width = `${pct}%`;
+        scrubberThumb.style.left = `${pct}%`;
+        if (timeCurrent) timeCurrent.textContent = formatSec(currentTime);
+        if (timeTotal) timeTotal.textContent = formatSec(duration);
+    }
+
+    function startProgressTicker() {
+        stopProgressTicker();
+        progressInterval = setInterval(() => {
+            if (ytPlayer && playerReady && isPlaying) {
+                try {
+                    const cur = ytPlayer.getCurrentTime();
+                    const dur = ytPlayer.getDuration();
+                    updateProgress(cur, dur);
+                } catch (e) {}
+            }
+        }, 350);
+    }
+
+    function stopProgressTicker() {
+        if (progressInterval) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+        }
+    }
     
     // ─── Search YouTube ──────────────────────────
     const searchInput = document.getElementById('search-input');
@@ -187,6 +239,9 @@
     // ─── Queue rendering ─────────────────────────
     function renderQueue() {
         trackList.innerHTML = '';
+        if (queueCount && currentPl) {
+            queueCount.textContent = `${currentPl.tracks.length} tracks`;
+        }
         currentPl.tracks.forEach((t, i) => {
             const el = document.createElement('div');
             el.className = 'track-item' + (i === currentIdx ? ' active' : '');
@@ -267,6 +322,7 @@
         currentIdx = idx;
         const t = currentPl.tracks[idx];
         
+        updateProgress(0, 0);
         syncMeta();
         setPlaying(true);
 
@@ -322,6 +378,11 @@
         iconPlay.style.display  = val ? 'none' : 'block';
         iconPause.style.display = val ? 'block' : 'none';
         document.body.classList.toggle('is-playing', val);
+        if (val) {
+            startProgressTicker();
+        } else {
+            stopProgressTicker();
+        }
     }
 
     // ─── Controls ────────────────────────────────
@@ -396,6 +457,56 @@
     }
 
     
+    // ─── Scrubber Seeking Interactions ──────────
+    function seekFromEvent(e) {
+        if (!ytPlayer || !playerReady || !scrubberTrack) return;
+        const rect = scrubberTrack.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+        if (scrubberFill) scrubberFill.style.width = `${pct * 100}%`;
+        if (scrubberThumb) scrubberThumb.style.left = `${pct * 100}%`;
+        try {
+            const dur = ytPlayer.getDuration() || 0;
+            if (dur > 0) {
+                const seekTime = pct * dur;
+                if (timeCurrent) timeCurrent.textContent = formatSec(seekTime);
+                ytPlayer.seekTo(seekTime, true);
+            }
+        } catch (err) {}
+    }
+
+    if (scrubberTrack) {
+        scrubberTrack.addEventListener('mousedown', (e) => {
+            isScrubbing = true;
+            scrubberTrack.classList.add('is-dragging');
+            seekFromEvent(e);
+            const onMove = (ev) => seekFromEvent(ev);
+            const onUp = () => {
+                isScrubbing = false;
+                scrubberTrack.classList.remove('is-dragging');
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        });
+
+        scrubberTrack.addEventListener('touchstart', (e) => {
+            isScrubbing = true;
+            scrubberTrack.classList.add('is-dragging');
+            seekFromEvent(e);
+            const onTouchMove = (ev) => seekFromEvent(ev);
+            const onTouchEnd = () => {
+                isScrubbing = false;
+                scrubberTrack.classList.remove('is-dragging');
+                window.removeEventListener('touchmove', onTouchMove);
+                window.removeEventListener('touchend', onTouchEnd);
+            };
+            window.addEventListener('touchmove', onTouchMove);
+            window.addEventListener('touchend', onTouchEnd);
+        }, { passive: true });
+    }
+
     // ─── YouTube IFrame API ──────────────────────
     window.onYouTubeIframeAPIReady = function () {
         ytPlayer = new YT.Player('yt-player', {
@@ -418,16 +529,21 @@
     function onState(e) {
         if (e.data === YT.PlayerState.PLAYING) {
             setPlaying(true);
+            startProgressTicker();
+            const curTrack = currentPl && currentPl.tracks[currentIdx];
             const vd = ytPlayer.getVideoData();
             if (vd && vd.title) {
-                if (vd.video_id) {
+                // Preserve high-res artwork; only fallback to YouTube if no artwork exists
+                if ((!curTrack || !curTrack.thumbnail) && vd.video_id) {
                     diskLabel.style.backgroundImage = `url('https://i.ytimg.com/vi/${vd.video_id}/hqdefault.jpg')`;
                 }
-                syncMeta(vd.title, vd.author || 'YouTube');
+                syncMeta(curTrack ? curTrack.title : vd.title, curTrack ? curTrack.artist : (vd.author || 'YouTube'));
             }
         } else if (e.data === YT.PlayerState.PAUSED) {
             setPlaying(false);
+            stopProgressTicker();
         } else if (e.data === YT.PlayerState.ENDED) {
+            stopProgressTicker();
             if (currentPl) {
                 playTrack((currentIdx + 1) % currentPl.tracks.length);
             }
