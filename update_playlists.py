@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
-import json, subprocess, sys
+import json, subprocess, sys, shutil, os
+
+def get_ytdlp_cmd():
+    # 1. yt-dlp on system PATH (GitHub Actions, global install)
+    which_bin = shutil.which("yt-dlp")
+    if which_bin:
+        return [which_bin]
+    # 2. Local virtualenv in workspace
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    venv_bin = os.path.join(script_dir, "venv", "bin", "yt-dlp")
+    if os.path.exists(venv_bin):
+        return [venv_bin]
+    # 3. Python module fallback
+    return [sys.executable, "-m", "yt_dlp"]
 
 PLAYLISTS = [
     {"title": "90s Evergreen Bollywood", "query": "90s evergreen bollywood hit songs audio"},
@@ -19,10 +32,11 @@ PLAYLISTS = [
 ]
 
 def fetch(query):
-    print(f"  Searching '{query}' ...")
+    ytdlp_cmd = get_ytdlp_cmd()
+    print(f"  Searching '{query}' using {' '.join(ytdlp_cmd)} ...")
     try:
         r = subprocess.run(
-            ["venv/bin/yt-dlp", f"ytsearch25:{query}", "--flat-playlist", "-J"],
+            ytdlp_cmd + [f"ytsearch25:{query}", "--flat-playlist", "-J"],
             capture_output=True, text=True, check=True, timeout=180
         )
         data = json.loads(r.stdout)
@@ -47,25 +61,35 @@ def fetch(query):
         print(f"    ERROR: {ex}")
         return []
 
-playlists_js = []
-for pl in PLAYLISTS:
-    print(f"\n{pl['title']}")
-    tracks = fetch(pl["query"])
-    if not tracks:
-        continue
-    tracks_json = json.dumps(tracks, ensure_ascii=False, indent=12)
-    pl_js = f"""        {{
+def main():
+    playlists_js = []
+    total_tracks = 0
+    for pl in PLAYLISTS:
+        print(f"\n{pl['title']}")
+        tracks = fetch(pl["query"])
+        if not tracks:
+            continue
+        total_tracks += len(tracks)
+        tracks_json = json.dumps(tracks, ensure_ascii=False, indent=12)
+        pl_js = f"""        {{
             title: {json.dumps(pl['title'])},
             youtubeListId: "",
             tracks: {tracks_json}
         }}"""
-    playlists_js.append(pl_js)
+        playlists_js.append(pl_js)
 
-output = "window.RoadtripData = {\n    playlists: [\n"
-output += ",\n".join(playlists_js)
-output += "\n    ]\n};\n"
+    if not playlists_js or total_tracks == 0:
+        print("\nERROR: No tracks were successfully fetched! Aborting to prevent wiping data.js.")
+        sys.exit(1)
 
-with open("assets/js/data.js", "w", encoding="utf-8") as f:
-    f.write(output)
+    output = "window.RoadtripData = {\n    playlists: [\n"
+    output += ",\n".join(playlists_js)
+    output += "\n    ]\n};\n"
 
-print("\n data.js written cleanly!")
+    with open("assets/js/data.js", "w", encoding="utf-8") as f:
+        f.write(output)
+
+    print(f"\n data.js written cleanly! ({len(playlists_js)} playlists, {total_tracks} tracks)")
+
+if __name__ == "__main__":
+    main()
