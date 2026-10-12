@@ -602,6 +602,10 @@ button { cursor: pointer; font: inherit; background: none; border: none; color: 
         margin-top: 8px;
     }
 
+    .tonearm, .tonearm-base {
+        scale: 0.85;
+    }
+
     .meta { margin-bottom: clamp(10px, 2vh, 20px); }
 
     .controls { gap: 24px; }
@@ -704,7 +708,30 @@ button { cursor: pointer; font: inherit; background: none; border: none; color: 
     justify-content: center;
 }
 
-/* ─── REALISTIC TONEARM WITH DROP SHADOW ─── */
+/* ─── REALISTIC TONEARM WITH SUSPENSION TRACKING & WOBBLE ─── */
+.tonearm-base {
+    position: absolute;
+    top: -24px;
+    right: -24px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: radial-gradient(circle at center, #27272a 0%, #18181b 58%, #09090b 100%);
+    border: 1.5px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    z-index: 10;
+    pointer-events: none;
+    transform-origin: 22px 22px;
+}
+
+.tonearm-base::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .tonearm {
     position: absolute;
     top: -24px;
@@ -713,53 +740,185 @@ button { cursor: pointer; font: inherit; background: none; border: none; color: 
     height: 195px;
     z-index: 12;
     transform-origin: 22px 22px;
-    transform: rotate(-24deg); /* off position */
-    transition: transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+    transform: rotate(-24deg); /* off position: resting on armrest */
+    transition: transform 0.75s cubic-bezier(0.25, 1, 0.4, 1);
     pointer-events: none;
     filter: drop-shadow(4px 10px 14px rgba(0, 0, 0, 0.65));
 }
 
 body.is-playing:not(.is-muted) .tonearm {
-    transform: rotate(20deg); /* on position resting on grooves */
+    transform: rotate(20.5deg); /* on position: tracking vinyl grooves */
 }
 
+.tonearm-rotor {
+    position: absolute;
+    inset: 0;
+    transform-origin: 22px 22px;
+    transform: rotate(0deg);
+}
+
+/* Organic micro-wobble tracking the spinning record eccentricity */
+body.is-playing:not(.is-muted) .tonearm-rotor {
+    animation: armTrackingWobble 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes armTrackingWobble {
+    0%   { transform: rotate(-0.35deg); }
+    22%  { transform: rotate(0.42deg); }
+    45%  { transform: rotate(-0.25deg); }
+    68%  { transform: rotate(0.48deg); }
+    85%  { transform: rotate(-0.18deg); }
+    100% { transform: rotate(0.32deg); }
+}
+
+/* Machined steel counterweight assembly behind pivot */
+.tonearm-counterweight {
+    position: absolute;
+    top: -18px;
+    left: 10px;
+    width: 24px;
+    height: 22px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #1c1c1f 0%, #3f3f46 22%, #a1a1aa 45%, #f4f4f5 55%, #71717a 78%, #18181b 100%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+    z-index: 14;
+}
+
+.tonearm-counterweight::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 8px;
+    width: 8px;
+    height: 5px;
+    background: linear-gradient(90deg, #52525b, #e4e4e7, #3f3f46);
+    border-radius: 2px 2px 0 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: none;
+}
+
+.tonearm-counterweight::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 1px;
+    right: 1px;
+    height: 5px;
+    background: repeating-linear-gradient(90deg, #09090b 0, #09090b 2px, #71717a 3px, #09090b 4px);
+    border-radius: 1px;
+    opacity: 0.85;
+}
+
+/* Precision Gimbal Pivot Housing */
 .tonearm-pivot {
     position: absolute;
-    top: 0;
+    top: 4px;
     left: 4px;
     width: 36px;
     height: 36px;
     background: radial-gradient(circle at 35% 35%, #ffffff 0%, #d4d4d8 35%, #71717a 70%, #27272a 100%);
     border-radius: 50%;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), inset 0 1px 2px #fff, inset 0 -2px 5px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65), inset 0 1px 2px #fff, inset 0 -2px 5px rgba(0, 0, 0, 0.5);
     border: 2px solid #52525b;
+    z-index: 15;
 }
 
+.tonearm-pivot::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #a1a1aa 50%, #18181b 100%);
+    border: 1px solid #52525b;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Polished stainless tone wand */
 .tonearm-arm {
     position: absolute;
     top: 18px;
     left: 19px;
     width: 7px;
     height: 148px;
-    background: linear-gradient(90deg, #52525b 0%, #e4e4e7 40%, #ffffff 60%, #71717a 100%);
+    background: linear-gradient(90deg, #3f3f46 0%, #a1a1aa 25%, #ffffff 50%, #e4e4e7 70%, #71717a 88%, #27272a 100%);
     border-radius: 4px;
     box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.5);
     transform-origin: top center;
     transform: rotate(-10deg);
+    z-index: 13;
 }
 
+/* Headshell & Cartridge assembly */
 .tonearm-head {
     position: absolute;
     bottom: 22px;
     left: -20px;
     width: 17px;
     height: 34px;
-    background: linear-gradient(135deg, #18181b 0%, #27272a 60%, #fc3c44 100%); /* DJ red stylus accent */
+    background: linear-gradient(135deg, #18181b 0%, #27272a 60%, #3f3f46 100%);
     border-radius: 4px 4px 6px 6px;
     box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.7);
+    transform-origin: top center;
     transform: rotate(-10deg);
     border-top: 2px solid #a1a1aa;
     border-left: 1px solid rgba(255, 255, 255, 0.2);
+    z-index: 14;
+}
+
+/* Microscopic needle compliance flex when riding grooves */
+body.is-playing:not(.is-muted) .tonearm-head {
+    animation: needleCompliance 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes needleCompliance {
+    0%   { transform: rotate(-10deg) translateY(0); }
+    30%  { transform: rotate(-9.5deg) translateY(0.35px); }
+    65%  { transform: rotate(-10.4deg) translateY(-0.15px); }
+    100% { transform: rotate(-9.7deg) translateY(0.25px); }
+}
+
+/* Curved metal finger-lift for manual cueing */
+.tonearm-fingerlift {
+    position: absolute;
+    top: 2px;
+    right: -8px;
+    width: 9px;
+    height: 13px;
+    border-right: 2px solid #d4d4d8;
+    border-top: 2px solid #d4d4d8;
+    border-top-right-radius: 7px;
+    pointer-events: none;
+    filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Audiophile phono cartridge */
+.tonearm-cartridge {
+    position: absolute;
+    bottom: 0;
+    left: 2px;
+    right: 2px;
+    height: 14px;
+    background: linear-gradient(180deg, #27272a 0%, #09090b 100%);
+    border-radius: 0 0 3px 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Glowing high-precision stylus & cantilever tip */
+.tonearm-stylus {
+    position: absolute;
+    bottom: -5px;
+    left: 5px;
+    width: 6px;
+    height: 6px;
+    background: #ff3b30;
+    clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
+    box-shadow: 0 0 6px rgba(255, 59, 48, 0.9);
+    filter: drop-shadow(0 0 3px rgba(255, 59, 48, 0.8));
 }
 
 /* ─── REALISTIC & AESTHETIC PICTURE DISC VINYL ─── */
