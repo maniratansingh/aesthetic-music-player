@@ -844,7 +844,7 @@ body.is-playing:not(.is-muted) .tonearm-rotor {
     top: 18px;
     left: 19px;
     width: 7px;
-    height: 148px;
+    height: 142px;
     background: linear-gradient(90deg, #3f3f46 0%, #a1a1aa 25%, #ffffff 50%, #e4e4e7 70%, #71717a 88%, #27272a 100%);
     border-radius: 4px;
     box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.5);
@@ -853,15 +853,29 @@ body.is-playing:not(.is-muted) .tonearm-rotor {
     z-index: 13;
 }
 
-/* Headshell & Cartridge assembly */
+/* Precision bayonet connector collar joining wand to headshell */
+.tonearm-connector {
+    position: absolute;
+    bottom: 0;
+    left: -2px;
+    width: 11px;
+    height: 10px;
+    background: linear-gradient(90deg, #18181b 0%, #71717a 30%, #e4e4e7 60%, #27272a 100%);
+    border-radius: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    z-index: 2;
+}
+
+/* Headshell & Cartridge assembly — mounted seamlessly at the tip of the wand */
 .tonearm-head {
     position: absolute;
-    bottom: 22px;
-    left: -20px;
+    top: calc(100% - 2px);
+    left: -5px;
     width: 17px;
     height: 34px;
     background: linear-gradient(135deg, #18181b 0%, #27272a 60%, #3f3f46 100%);
-    border-radius: 4px 4px 6px 6px;
+    border-radius: 2px 2px 6px 6px;
     box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.7);
     transform-origin: top center;
     transform: rotate(-10deg);
