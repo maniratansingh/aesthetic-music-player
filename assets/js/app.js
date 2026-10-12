@@ -63,6 +63,8 @@
     
     const btnQueueMobile  = document.getElementById('btn-queue-mobile');
     const btnCloseQueue   = document.getElementById('btn-close-queue');
+    const btnShuffleQueue = document.getElementById('btn-shuffle-queue');
+    const btnLocatePlaying= document.getElementById('btn-locate-playing');
     const mobilePlName    = document.getElementById('mobile-playlist-name');
 
     // ─── Scrubber Elements ───────────────────────
@@ -244,25 +246,92 @@
         }
         currentPl.tracks.forEach((t, i) => {
             const el = document.createElement('div');
-            el.className = 'track-item' + (i === currentIdx ? ' active' : '');
+            const isActive = (i === currentIdx);
+            el.className = 'track-item' + (isActive ? ' active' : '');
+            el.dataset.index = i;
             el.innerHTML = `
-                <img class="ti-thumb" src="${t.thumbnail || ''}" alt="" onerror="this.style.display='none'">
+                <span class="ti-num">${(i + 1).toString().padStart(2, '0')}</span>
+                <div class="ti-thumb-wrap">
+                    <img class="ti-thumb" src="${t.thumbnail || ''}" alt="" onerror="this.style.opacity='0'">
+                    <div class="ti-thumb-overlay">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                </div>
                 <div class="ti-info">
                     <div class="ti-title">
-                        <span class="ti-name">${clean(t.title)}</span>
-                        <div class="eq"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>
+                        <span class="ti-name" title="${clean(t.title)}">${clean(t.title)}</span>
                     </div>
-                    <div class="ti-artist">${t.artist || ''}</div>
+                    <div class="ti-artist">${t.artist || 'Unknown'}</div>
                 </div>
-                <div class="ti-dur">${t.duration || ''}</div>`;
+                <div class="ti-right">
+                    <div class="eq">
+                        <div class="eq-bar"></div>
+                        <div class="eq-bar"></div>
+                        <div class="eq-bar"></div>
+                        <div class="eq-bar"></div>
+                    </div>
+                    <span class="ti-dur">${t.duration || ''}</span>
+                </div>`;
             el.addEventListener('click', () => {
                 currentIdx = i;
                 playTrack(i);
-                queue.classList.remove('open');
-                
-                
+                if (window.innerWidth <= 900) {
+                    queue.classList.remove('open');
+                }
             });
             trackList.appendChild(el);
+        });
+    }
+
+    if (btnShuffleQueue) {
+        btnShuffleQueue.addEventListener('click', () => {
+            if (!currentPl || !currentPl.tracks || currentPl.tracks.length <= 1) return;
+            const playingTrack = currentPl.tracks[currentIdx];
+            const otherTracks = currentPl.tracks.filter((_, idx) => idx !== currentIdx);
+            for (let i = otherTracks.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [otherTracks[i], otherTracks[j]] = [otherTracks[j], otherTracks[i]];
+            }
+            currentPl.tracks = [playingTrack, ...otherTracks];
+            currentIdx = 0;
+            renderQueue();
+            btnShuffleQueue.classList.add('shuffle-active');
+            setTimeout(() => btnShuffleQueue.classList.remove('shuffle-active'), 550);
+        });
+    }
+
+    if (btnLocatePlaying) {
+        btnLocatePlaying.addEventListener('click', () => {
+            const active = trackList.querySelector('.track-item.active');
+            if (active) {
+                active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                active.classList.add('locate-highlight');
+                setTimeout(() => active.classList.remove('locate-highlight'), 1200);
+            }
+        });
+    }
+
+    if (btnMenu) {
+        btnMenu.addEventListener('click', () => {
+            sidebar.classList.add('open');
+        });
+    }
+
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+        });
+    }
+
+    if (btnQueueMobile) {
+        btnQueueMobile.addEventListener('click', () => {
+            queue.classList.toggle('open');
+        });
+    }
+
+    if (btnCloseQueue) {
+        btnCloseQueue.addEventListener('click', () => {
+            queue.classList.remove('open');
         });
     }
 
