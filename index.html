@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Aura — Music</title>
-    <link rel="stylesheet" href="assets/css/styles.css?v=41">
+    <title>MRPS Music</title>
+    <link rel="stylesheet" href="assets/css/styles.css?v=42">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -14,17 +14,38 @@
         <!-- SIDEBAR -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-inner">
-                                <div class="brand">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-                    <span>Aura</span>
+                <a class="brand" href="https://mrps.in" target="_blank" rel="noopener" title="Visit mrps.in">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+                    <div class="brand-text">
+                        <span class="brand-name">MRPS MUSIC</span>
+                        <span class="brand-domain">mrps.in</span>
+                    </div>
+                </a>
+
+                <!-- SEARCH -->
+                <div class="search-wrap" id="search-wrap">
+                    <div class="search-box" id="search-box">
+                        <svg class="search-icon" id="search-icon-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="search-input" placeholder="Search songs, artists..." autocomplete="off" spellcheck="false">
+                        <div class="search-spinner" id="search-spinner" style="display:none">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                        </div>
+                        <button id="btn-search-clear" class="search-clear-btn" style="display:none" title="Clear">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                    <!-- SEARCH RESULTS DROPDOWN -->
+                    <div class="search-dropdown" id="search-dropdown">
+                        <div class="search-recommendations" id="search-recommendations">
+                            <div class="search-section-label">Quick Picks</div>
+                            <div class="search-chips" id="search-chips"></div>
+                            <div class="search-section-label" id="recents-label" style="display:none">Recent Searches</div>
+                            <div class="search-recents" id="search-recents"></div>
+                        </div>
+                        <div class="search-results-list" id="search-results-list" style="display:none"></div>
+                    </div>
                 </div>
-                <div class="search-box">
-                    <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <input type="text" id="search-input" placeholder="Search songs, artists..." autocomplete="off">
-                    <button id="btn-search" title="Search">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    </button>
-                </div>
+
                 <nav id="playlist-nav"></nav>
             </div>
             <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
@@ -125,9 +146,9 @@
 
     <div style="position:fixed;width:1px;height:1px;opacity:0.01;z-index:-100;pointer-events:none;overflow:hidden"><div id="yt-player"></div></div>
 
-    <script src="assets/js/data.js?v=41"></script>
+    <script src="assets/js/data.js?v=42"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="assets/js/shader.js?v=41"></script>
-    <script src="assets/js/app.js?v=41"></script>
+    <script src="assets/js/shader.js?v=42"></script>
+    <script src="assets/js/app.js?v=42"></script>
 </body>
 </html>

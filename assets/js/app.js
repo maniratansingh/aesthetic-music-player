@@ -127,12 +127,323 @@
         }
     }
     
-    // ─── Search YouTube ──────────────────────────
-    const searchInput = document.getElementById('search-input');
-    const btnSearch   = document.getElementById('btn-search');
-    
+    // ─── SEARCH ENGINE ────────────────────────────
+    const searchInput      = document.getElementById('search-input');
+    const searchBox        = document.getElementById('search-box');
+    const searchDropdown   = document.getElementById('search-dropdown');
+    const searchSpinner    = document.getElementById('search-spinner');
+    const btnSearchClear   = document.getElementById('btn-search-clear');
+    const searchChips      = document.getElementById('search-chips');
+    const searchRecents    = document.getElementById('search-recents');
+    const recentsLabel     = document.getElementById('recents-label');
+    const searchResultsList= document.getElementById('search-results-list');
+    const searchRecos      = document.getElementById('search-recommendations');
 
-    // ─── Build playlist nav ──────────────────────
+    let searchDebounce     = null;
+    let currentSearchResults = [];
+
+    // ─── Quick pick recommendation chips ─────────
+    const CHIPS = [
+        { label: '90s Bollywood', emoji: '🎵' },
+        { label: 'Arijit Singh', emoji: '🎤' },
+        { label: 'Lo-Fi Chill', emoji: '🌙' },
+        { label: 'A.R. Rahman', emoji: '🌟' },
+        { label: 'Punjabi Hits', emoji: '🎶' },
+        { label: 'Taylor Swift', emoji: '✨' },
+        { label: 'Hip Hop', emoji: '🔥' },
+        { label: 'Soulful Jazz', emoji: '🎷' },
+    ];
+
+    function renderChips() {
+        searchChips.innerHTML = '';
+        CHIPS.forEach(chip => {
+            const el = document.createElement('button');
+            el.className = 'search-chip';
+            el.innerHTML = `<span>${chip.emoji}</span><span>${chip.label}</span>`;
+            el.addEventListener('click', () => {
+                searchInput.value = chip.label;
+                doLiveSearch(chip.label);
+                saveRecent(chip.label);
+            });
+            searchChips.appendChild(el);
+        });
+    }
+
+    // ─── Recent searches (localStorage) ──────────
+    function getRecents() {
+        try { return JSON.parse(localStorage.getItem('mrps_recents') || '[]'); } catch { return []; }
+    }
+    function saveRecent(q) {
+        let r = getRecents().filter(x => x.toLowerCase() !== q.toLowerCase());
+        r.unshift(q);
+        r = r.slice(0, 6);
+        try { localStorage.setItem('mrps_recents', JSON.stringify(r)); } catch {}
+        renderRecents();
+    }
+    function removeRecent(q) {
+        const r = getRecents().filter(x => x !== q);
+        try { localStorage.setItem('mrps_recents', JSON.stringify(r)); } catch {}
+        renderRecents();
+    }
+    function renderRecents() {
+        const r = getRecents();
+        if (!r.length) { recentsLabel.style.display = 'none'; searchRecents.innerHTML = ''; return; }
+        recentsLabel.style.display = '';
+        searchRecents.innerHTML = '';
+        r.forEach(q => {
+            const el = document.createElement('div');
+            el.className = 'search-recent-item';
+            el.innerHTML = `
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.13"/></svg>
+                <span>${q}</span>
+                <button class="search-recent-remove" title="Remove">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>`;
+            el.querySelector('span').addEventListener('click', () => {
+                searchInput.value = q;
+                doLiveSearch(q);
+            });
+            el.querySelector('.search-recent-remove').addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeRecent(q);
+            });
+            searchRecents.appendChild(el);
+        });
+    }
+
+    // ─── Open/close dropdown ──────────────────────
+    function openDropdown() {
+        searchBox.classList.add('active');
+        searchDropdown.classList.add('open');
+    }
+    function closeDropdown() {
+        searchBox.classList.remove('active');
+        searchDropdown.classList.remove('open');
+    }
+
+    searchInput.addEventListener('focus', () => {
+        renderChips();
+        renderRecents();
+        openDropdown();
+        if (searchInput.value.trim().length >= 2) {
+            showResults(currentSearchResults);
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!searchBox.contains(e.target) && !searchDropdown.contains(e.target)) {
+            closeDropdown();
+        }
+    });
+
+    // ─── Clear button ─────────────────────────────
+    searchInput.addEventListener('input', () => {
+        const v = searchInput.value;
+        btnSearchClear.style.display = v.length ? 'flex' : 'none';
+        if (!v.trim()) {
+            searchResultsList.style.display = 'none';
+            searchRecos.style.display = '';
+            currentSearchResults = [];
+            return;
+        }
+        // Debounced live search
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => doLiveSearch(v.trim()), 380);
+    });
+
+    if (btnSearchClear) {
+        btnSearchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            btnSearchClear.style.display = 'none';
+            searchResultsList.style.display = 'none';
+            searchRecos.style.display = '';
+            currentSearchResults = [];
+            searchInput.focus();
+        });
+    }
+
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const q = searchInput.value.trim();
+            if (q) { doLiveSearch(q); saveRecent(q); }
+        }
+        if (e.key === 'Escape') closeDropdown();
+    });
+
+    // ─── Typo-tolerant query normalization ───────
+    function normalizeQuery(q) {
+        // common music typos / Indian English variations
+        const fixes = {
+            'arijt': 'arijit', 'arjit': 'arijit', 'arjith': 'arijit',
+            'rahman': 'a r rahman', 'ar rahman': 'a r rahman',
+            'lofi': 'lo-fi', 'lofI': 'lo-fi',
+            'bolywood': 'bollywood', 'bollywod': 'bollywood',
+            'tayler': 'taylor', 'swfit': 'swift',
+            'shakria': 'shakira', 'eminen': 'eminem',
+            'beatles': 'the beatles', 'coldply': 'coldplay',
+        };
+        let norm = q.toLowerCase().trim();
+        Object.entries(fixes).forEach(([typo, fix]) => {
+            norm = norm.replace(new RegExp(typo, 'gi'), fix);
+        });
+        return norm;
+    }
+
+    // ─── Format ms to m:ss ───────────────────────
+    function formatTime(ms) {
+        if (!ms) return '';
+        const s = Math.floor(ms / 1000);
+        const m = Math.floor(s / 60);
+        return `${m}:${(s % 60).toString().padStart(2, '0')}`;
+    }
+
+    // ─── Quality scoring for results ─────────────
+    function scoreResult(r, q) {
+        let score = 0;
+        const title = (r.trackName || '').toLowerCase();
+        const artist = (r.artistName || '').toLowerCase();
+        const query = q.toLowerCase();
+        if (title.startsWith(query)) score += 20;
+        if (title.includes(query)) score += 10;
+        if (artist.includes(query)) score += 8;
+        if (r.trackCount) score += Math.min(r.trackCount / 100, 3);
+        // Penalize very short durations (likely skits/intros)
+        if (r.trackTimeMillis && r.trackTimeMillis < 60000) score -= 8;
+        // Boost verified/popular artists
+        if (r.primaryGenreName !== 'Music') score -= 2;
+        return score;
+    }
+
+    // ─── Live search via iTunes API ──────────────
+    async function doLiveSearch(rawQuery) {
+        const q = normalizeQuery(rawQuery);
+        if (!q) return;
+
+        // Show spinner
+        searchSpinner.style.display = 'flex';
+        searchRecos.style.display = 'none';
+        searchResultsList.style.display = '';
+        searchResultsList.innerHTML = '';
+
+        try {
+            // Search with higher limit then filter+score for quality
+            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&limit=50&media=music&entity=song`;
+            const res = await fetch(url);
+            const json = await res.json();
+
+            searchSpinner.style.display = 'none';
+
+            if (!json.results || !json.results.length) {
+                showNoResults(rawQuery);
+                return;
+            }
+
+            // Score & deduplicate by title+artist
+            const seen = new Set();
+            const scored = json.results
+                .map(r => ({ r, score: scoreResult(r, q) }))
+                .filter(({ r }) => {
+                    const key = `${(r.trackName||'').toLowerCase()}|${(r.artistName||'').toLowerCase()}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                })
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 15)
+                .map(({ r }) => ({
+                    title: r.trackName || 'Unknown',
+                    artist: r.artistName || '',
+                    thumbnail: (r.artworkUrl100 || '').replace('100x100bb', '400x400bb'),
+                    duration: formatTime(r.trackTimeMillis),
+                }));
+
+            currentSearchResults = scored;
+            showResults(scored, rawQuery);
+
+        } catch (err) {
+            searchSpinner.style.display = 'none';
+            console.error('Search error', err);
+            searchResultsList.innerHTML = `<div class="search-empty">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <p>Search unavailable</p><small>Check your internet connection</small></div>`;
+        }
+    }
+
+    // ─── Render results list ──────────────────────
+    function showResults(results, query = '') {
+        searchResultsList.style.display = '';
+        searchRecos.style.display = 'none';
+        searchResultsList.innerHTML = '';
+
+        if (!results.length) { showNoResults(query); return; }
+
+        const header = document.createElement('div');
+        header.className = 'search-result-header';
+        header.innerHTML = `
+            <span class="search-result-header-text">Results</span>
+            <button class="search-result-play-all" id="sri-play-all">Play All</button>`;
+        searchResultsList.appendChild(header);
+
+        header.querySelector('#sri-play-all').addEventListener('click', () => {
+            loadSearchResults(results, 0);
+            closeDropdown();
+        });
+
+        results.forEach((t, i) => {
+            const el = document.createElement('div');
+            el.className = 'search-result-item';
+            el.innerHTML = `
+                <img class="sri-thumb" src="${t.thumbnail}" alt="" onerror="this.style.opacity=0">
+                <div class="sri-info">
+                    <div class="sri-title">${t.title}</div>
+                    <div class="sri-artist">${t.artist}</div>
+                </div>
+                ${t.duration ? `<span class="sri-dur">${t.duration}</span>` : ''}
+                <div class="sri-play-btn">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </div>`;
+            el.addEventListener('click', () => {
+                loadSearchResults(results, i);
+                if (query) saveRecent(query);
+                closeDropdown();
+                searchInput.value = '';
+                btnSearchClear.style.display = 'none';
+            });
+            searchResultsList.appendChild(el);
+        });
+    }
+
+    function showNoResults(query) {
+        searchResultsList.innerHTML = `<div class="search-empty">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <p>No results for "${query}"</p>
+            <small>Try a different spelling or artist name</small></div>`;
+    }
+
+    // ─── Load search results into player ─────────
+    function loadSearchResults(tracks, startIdx) {
+        const searchPl = {
+            title: `Search Results`,
+            tracks: tracks
+        };
+        const existingIdx = data.playlists.findIndex(p => p.title === 'Search Results');
+        if (existingIdx >= 0) {
+            data.playlists[existingIdx] = searchPl;
+            renderPlaylistNav();
+            currentPl = data.playlists[existingIdx];
+        } else {
+            data.playlists.unshift(searchPl);
+            renderPlaylistNav();
+            currentPl = data.playlists[0];
+        }
+        currentIdx = startIdx;
+        mobilePlName.textContent = 'Search Results';
+        renderQueue();
+        syncMeta();
+        if (playerReady) playTrack(startIdx);
+    }
+
+
     function renderPlaylistNav() {
         playlistNav.innerHTML = '';
         data.playlists.forEach((pl, i) => {
@@ -153,73 +464,6 @@
         }
     }
 
-    function formatTime(ms) {
-        if (!ms) return "0:00";
-        const totalSeconds = Math.floor(ms / 1000);
-        const m = Math.floor(totalSeconds / 60);
-        const s = totalSeconds % 60;
-        return `${m}:${s.toString().padStart(2, '0')}`;
-    }
-
-    async function doSearch() {
-        const q = searchInput.value.trim();
-        if (!q || !ytPlayer || !playerReady) return;
-        
-        searchInput.placeholder = "Searching...";
-        const oldVal = searchInput.value;
-        searchInput.value = '';
-        
-        try {
-            const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&limit=30&media=music`);
-            const json = await res.json();
-            
-            if (json.results && json.results.length > 0) {
-                const searchPl = {
-                    title: `Search: ${q}`,
-                    tracks: json.results.map(r => ({
-                        title: r.trackName,
-                        artist: r.artistName,
-                        thumbnail: (r.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
-                        duration: formatTime(r.trackTimeMillis)
-                    }))
-                };
-                
-                const existingIdx = data.playlists.findIndex(p => p.title.startsWith('Search:'));
-                if (existingIdx >= 0) {
-                    data.playlists[existingIdx] = searchPl;
-                    renderPlaylistNav();
-                    loadPlaylist(existingIdx);
-                } else {
-                    data.playlists.unshift(searchPl);
-                    renderPlaylistNav();
-                    loadPlaylist(0);
-                }
-                
-                
-
-            } else {
-                alert('No results found for: ' + q);
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Search failed. Please try again.');
-        }
-        
-        // Mobile UX: Close the sidebar so they can see the vinyl player!
-        if (sidebar && sidebar.classList.contains('open')) {
-            sidebar.classList.remove('open');
-        }
-        
-        searchInput.placeholder = "Search YouTube...";
-        searchInput.blur(); // Hide mobile keyboard
-    }
-
-    if (btnSearch) {
-        btnSearch.addEventListener('click', doSearch);
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') doSearch();
-        });
-    }
 
     // Auto-select first
     renderPlaylistNav();
