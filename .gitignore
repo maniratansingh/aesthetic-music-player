@@ -16,4 +16,6 @@ upgrade_*.py
 truck.html
 test_*.html
 test_*.js
+dist/
+cloudflare-upload/
 
