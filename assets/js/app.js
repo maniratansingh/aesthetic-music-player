@@ -239,10 +239,48 @@
         const raw = (rawQuery || '').trim();
         if (!raw) return { normalized: '', wasCorrected: false, original: '' };
 
-        let tokens = raw.toLowerCase().split(/\s+/);
-        let correctedTokens = tokens.map(tok => {
-            if (TYPO_MAP[tok]) return TYPO_MAP[tok];
-            // Check Levenshtein against top target keywords if token length >= 4
+        const lowerRaw = raw.toLowerCase().replace(/\s+/g, ' ');
+
+        // Expand single-word artist searches only when user typed that single word
+        const SINGLE_EXPANSIONS = {
+            'sanu': 'kumar sanu',
+            'narayan': 'udit narayan',
+            'ghoshal': 'shreya ghoshal',
+            'rafi': 'mohammad rafi',
+            'jagjit': 'jagjit singh',
+            'sheeran': 'ed sheeran',
+            'arijit': 'arijit singh',
+            'kishore': 'kishore kumar',
+            'lata': 'lata mangeshkar',
+            'mukesh': 'mukesh songs',
+            'rahman': 'a r rahman',
+            'burman': 'r d burman',
+            'pancham': 'r d burman',
+            'diljit': 'diljit dosanjh',
+            'sidhu': 'sidhu moose wala',
+            'taylor': 'taylor swift',
+            'weeknd': 'the weeknd'
+        };
+
+        if (SINGLE_EXPANSIONS[lowerRaw]) {
+            return { normalized: SINGLE_EXPANSIONS[lowerRaw], wasCorrected: true, original: raw };
+        }
+
+        let tokens = lowerRaw.split(' ');
+        let correctedTokens = tokens.map((tok, idx) => {
+            if (TYPO_MAP[tok]) {
+                const fix = TYPO_MAP[tok];
+                // Prevent duplicate prefixes/suffixes when typing full names
+                if (tok === 'sanu' && tokens[idx - 1] === 'kumar') return 'sanu';
+                if (tok === 'narayan' && tokens[idx - 1] === 'udit') return 'narayan';
+                if (tok === 'sheeran' && tokens[idx - 1] === 'ed') return 'sheeran';
+                if (tok === 'nigam' && tokens[idx - 1] === 'sonu') return 'nigam';
+                if (tok === 'sonu' && tokens[idx + 1] === 'nigam') return 'sonu';
+                if (tok === 'rafi' && (tokens[idx - 1] === 'mohammad' || tokens[idx - 1] === 'mohd')) return 'rafi';
+                return fix;
+            }
+
+            // Check Levenshtein fuzzy distance against dictionary
             if (tok.length >= 4) {
                 for (const [typo, fix] of Object.entries(TYPO_MAP)) {
                     if (levenshteinDistance(tok, typo) <= 1) {
@@ -253,7 +291,15 @@
             return tok;
         });
 
-        let normalized = correctedTokens.join(' ').replace(/\s+/g, ' ').trim();
+        // Collapse any accidental duplicates (e.g. 'kumar kumar' -> 'kumar')
+        let resultWords = [];
+        correctedTokens.join(' ').split(/\s+/).forEach(w => {
+            if (!resultWords.length || resultWords[resultWords.length - 1] !== w) {
+                resultWords.push(w);
+            }
+        });
+
+        const normalized = resultWords.join(' ').trim();
         const wasCorrected = normalized.toLowerCase() !== raw.toLowerCase();
         return { normalized, wasCorrected, original: raw };
     }
@@ -321,10 +367,11 @@
             el.innerHTML = `
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.13"/></svg>
                 <span class="search-suggestion-text">${escapeHtml(q)}</span>
-                <button class="search-recent-remove" title="Remove">
+                <button class="search-recent-remove" title="Remove" type="button">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>`;
-            el.querySelector('span').addEventListener('click', () => {
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.search-recent-remove')) return;
                 searchInput.value = q;
                 btnSearchClear.style.display = 'flex';
                 doLiveSearch(q);
@@ -362,6 +409,10 @@
         }
     });
 
+    searchInput.addEventListener('click', () => {
+        openDropdown();
+    });
+
     document.addEventListener('click', (e) => {
         if (!searchBox.contains(e.target) && !searchDropdown.contains(e.target)) {
             closeDropdown();
@@ -385,32 +436,38 @@
         // 1. Instant YouTube-style predictive query recommendations
         renderPredictiveSuggestions(v.trim());
 
-        // 2. Debounced deep live search to Apple iTunes API (320ms)
+        // 2. Debounced deep live search to multi-source engine (300ms)
         clearTimeout(searchDebounce);
         searchDebounce = setTimeout(() => {
             doLiveSearch(v.trim());
-        }, 320);
+        }, 300);
     });
 
     if (btnSearchClear) {
-        btnSearchClear.addEventListener('click', () => {
+        btnSearchClear.addEventListener('click', (e) => {
+            e.stopPropagation();
             searchInput.value = '';
             btnSearchClear.style.display = 'none';
             searchResultsList.style.display = 'none';
             searchRecos.style.display = '';
             currentSearchResults = [];
             activeNavIdx = -1;
+            renderChips();
+            renderRecents();
             searchInput.focus();
         });
     }
 
-    // ─── Keyboard Navigation (Arrow Keys + Enter) ───
+    // ─── Keyboard Navigation (Arrow Keys + Enter + Esc) ───
     searchInput.addEventListener('keydown', (e) => {
-        const items = searchDropdown.querySelectorAll('.search-result-item, .search-query-suggestion, .search-recent-item, .search-hero-card');
+        const items = searchDropdown.querySelectorAll('.search-result-item, .search-query-suggestion, .search-recent-item, .search-chip, .search-hero-card');
         if (!items.length) {
             if (e.key === 'Enter') {
                 const q = searchInput.value.trim();
                 if (q) { doLiveSearch(q); saveRecent(q); }
+            } else if (e.key === 'Escape') {
+                closeDropdown();
+                searchInput.blur();
             }
             return;
         }
@@ -433,6 +490,7 @@
             }
         } else if (e.key === 'Escape') {
             closeDropdown();
+            searchInput.blur();
         }
     });
 
@@ -445,6 +503,28 @@
         });
     }
 
+    // ─── Global Music Player Keyboard Hotkeys ─────
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+            return;
+        }
+
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (btnPlay) btnPlay.click();
+        } else if (e.code === 'ArrowRight' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            if (btnNext) btnNext.click();
+        } else if (e.code === 'ArrowLeft' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            if (btnPrev) btnPrev.click();
+        } else if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        }
+    });
+
     // ─── Helpers: Escape HTML & Highlight Matching Text ───
     function escapeHtml(str) {
         return String(str || '')
@@ -456,14 +536,23 @@
     }
 
     function highlightMatches(text, query) {
-        if (!query || !text) return escapeHtml(text);
+        if (!text) return '';
+        if (!query) return escapeHtml(text);
         const tokens = query.toLowerCase().split(/\s+/).filter(t => t.length >= 2);
         if (!tokens.length) return escapeHtml(text);
         tokens.sort((a, b) => b.length - a.length);
         const escaped = tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         try {
             const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
-            return escapeHtml(text).replace(regex, '<mark class="search-hl">$1</mark>');
+            const parts = text.split(regex);
+            const tokenSet = new Set(tokens.map(t => t.toLowerCase()));
+            return parts.map(part => {
+                if (!part) return '';
+                if (tokenSet.has(part.toLowerCase())) {
+                    return `<mark class="search-hl">${escapeHtml(part)}</mark>`;
+                }
+                return escapeHtml(part);
+            }).join('');
         } catch {
             return escapeHtml(text);
         }
@@ -693,7 +782,10 @@
     }
 
     // ─── Live Search via Typo Engine + Multi-Tier Search ─────────
+    let currentSearchId = 0;
+
     async function doLiveSearch(rawQuery) {
+        const thisSearchId = ++currentSearchId;
         const { normalized, wasCorrected, original } = normalizeQueryWithTypoCheck(rawQuery);
         const searchQ = normalized || rawQuery.trim();
         if (!searchQ) return;
@@ -705,10 +797,12 @@
 
         try {
             let results = await fetchMusicMultiSource(searchQ);
+            if (thisSearchId !== currentSearchId) return; // Stale search discarded
 
             // If corrected query returned 0, try raw query
             if ((!results || !results.length) && wasCorrected) {
                 results = await fetchMusicMultiSource(rawQuery);
+                if (thisSearchId !== currentSearchId) return;
             }
 
             searchSpinner.style.display = 'none';
@@ -720,6 +814,7 @@
 
             renderResults(results, searchQ, wasCorrected, original);
         } catch (err) {
+            if (thisSearchId !== currentSearchId) return;
             searchSpinner.style.display = 'none';
             console.error('Search error, using local fallback:', err);
             const local = searchLocalCatalog(rawQuery);
@@ -865,7 +960,23 @@
         searchResultsList.innerHTML = `<div class="search-empty">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             <p>No results found for "${escapeHtml(query)}"</p>
-            <small>Check for spelling errors or try artist names like Arijit Singh, Kishore Kumar, Taylor Swift</small></div>`;
+            <small>Try these popular picks instead:</small>
+            <div class="search-empty-chips">
+                <button class="search-empty-chip" data-q="Arijit Singh" type="button">🎤 Arijit Singh</button>
+                <button class="search-empty-chip" data-q="90s Bollywood" type="button">🎵 90s Bollywood</button>
+                <button class="search-empty-chip" data-q="Taylor Swift" type="button">✨ Taylor Swift</button>
+                <button class="search-empty-chip" data-q="Lo-Fi Chill" type="button">🌙 Lo-Fi Chill</button>
+            </div>
+        </div>`;
+        searchResultsList.querySelectorAll('.search-empty-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const q = btn.getAttribute('data-q');
+                searchInput.value = q;
+                btnSearchClear.style.display = 'flex';
+                doLiveSearch(q);
+                saveRecent(q);
+            });
+        });
     }
 
     // ─── Load Search Results into Player ─────────
@@ -877,12 +988,12 @@
         const existingIdx = data.playlists.findIndex(p => p.title.startsWith('Search:'));
         if (existingIdx >= 0) {
             data.playlists[existingIdx] = searchPl;
-            renderPlaylistNav();
             currentPl = data.playlists[existingIdx];
+            renderPlaylistNav();
         } else {
             data.playlists.unshift(searchPl);
-            renderPlaylistNav();
             currentPl = data.playlists[0];
+            renderPlaylistNav();
         }
         currentIdx = startIdx;
         mobilePlName.textContent = searchPl.title;
