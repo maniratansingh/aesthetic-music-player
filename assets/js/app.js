@@ -146,10 +146,9 @@
 
     // ─── Curated Knowledge Base for YouTube-Grade Suggestions ───
     const POPULAR_RECOMMENDATIONS = [
-        // Bollywood Legends & Modern Artists
+        // Bollywood Legends & Iconic Hindi Evergreen Artists
         { query: 'Arijit Singh', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/bf/14/08/bf14088a-9f57-b08e-1f7c-7f5fb2b24da8/190295851248.jpg/200x200bb.jpg' },
         { query: 'Arijit Singh romantic songs', category: 'Top Hits' },
-        { query: 'Arijit Singh sad songs', category: 'Top Hits' },
         { query: 'Kishore Kumar', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/4a/60/d1/4a60d131-08ec-be77-8cbe-3ca4bfcb6630/8902894354228_cover.jpg/200x200bb.jpg' },
         { query: 'Kishore Kumar classics', category: 'Top Hits' },
         { query: 'Lata Mangeshkar', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/37/a3/bb/37a3bbd5-1815-5cb9-8e7c-b3624e54546a/8902894354259_cover.jpg/200x200bb.jpg' },
@@ -157,25 +156,20 @@
         { query: 'Mukesh', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/fa/ec/9b/faec9be9-a5e2-0ce2-1ff6-e0e643ae4be8/8902894354273_cover.jpg/200x200bb.jpg' },
         { query: 'A.R. Rahman', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/28/fc/2a/28fc2afb-873b-eb63-12ce-131c944111be/886445591322.jpg/200x200bb.jpg' },
         { query: 'R.D. Burman', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/43/d8/d7/43d8d7b3-8186-0927-4ee5-4b08709ca8ae/8902894354280_cover.jpg/200x200bb.jpg' },
+        { query: 'Asha Bhosle', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/43/d8/d7/43d8d7b3-8186-0927-4ee5-4b08709ca8ae/8902894354280_cover.jpg/200x200bb.jpg' },
         { query: 'Kumar Sanu & Alka Yagnik', category: 'Top Hits' },
         { query: 'Udit Narayan', category: 'Artist' },
         { query: 'Shreya Ghoshal', category: 'Artist' },
         { query: 'Sonu Nigam', category: 'Artist' },
-        { query: 'Atif Aslam', category: 'Artist' },
+        { query: 'KK', category: 'Artist' },
+        { query: 'Shaan', category: 'Artist' },
+        { query: 'Mohit Chauhan', category: 'Artist' },
         { query: 'Jagjit Singh Ghazals', category: 'Genre' },
-        { query: 'Diljit Dosanjh', category: 'Artist' },
-        { query: 'Sidhu Moose Wala', category: 'Artist' },
+        { query: 'Pankaj Udhas', category: 'Artist' },
         { query: '90s Evergreen Bollywood', category: 'Playlist' },
         { query: 'Romantic Bollywood Songs', category: 'Mood' },
         { query: 'Lo-Fi Chill Hindi', category: 'Vibe' },
-        { query: 'Punjabi Party Hits', category: 'Vibe' },
-        { query: 'Taylor Swift', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/4b/f7/a9/4bf7a944-fb43-6c84-8848-18e4cf24c4e2/24UMGIM28751.rgb.jpg/200x200bb.jpg' },
-        { query: 'The Weeknd', category: 'Artist' },
-        { query: 'Ed Sheeran', category: 'Artist' },
-        { query: 'Coldplay', category: 'Artist' },
-        { query: 'Eminem', category: 'Artist' },
-        { query: 'Dua Lipa', category: 'Artist' },
-        { query: 'Billie Eilish', category: 'Artist' },
+        { query: 'Sadabahar Purane Gane', category: 'Genre' }
     ];
 
     // ─── Extensive Typo Normalization & Phonetic Dictionary ──────
@@ -307,15 +301,15 @@
     // ─── Quick Pick Recommendation Chips ─────────
     const CHIPS = [
         { label: '90s Bollywood', emoji: '🎵' },
-        { label: 'Arijit Singh', emoji: '🎤' },
-        { label: 'Lo-Fi Chill', emoji: '🌙' },
+        { label: 'Kishore Kumar', emoji: '👑' },
+        { label: 'Lata Mangeshkar', emoji: '🌹' },
+        { label: 'Mohammad Rafi', emoji: '🎙️' },
+        { label: 'R.D. Burman', emoji: '🎷' },
         { label: 'A.R. Rahman', emoji: '🌟' },
-        { label: 'Punjabi Hits', emoji: '🎶' },
-        { label: 'Kishore Kumar', emoji: '📻' },
-        { label: 'Taylor Swift', emoji: '✨' },
-        { label: 'Soulful Ghazals', emoji: '🎷' },
-        { label: 'Classic Rock', emoji: '🎸' },
-        { label: 'Hip Hop', emoji: '🔥' },
+        { label: 'Soulful Ghazals', emoji: '🕊️' },
+        { label: 'Mukesh Classics', emoji: '✨' },
+        { label: 'Kumar Sanu', emoji: '❤️' },
+        { label: 'Bollywood Lo-Fi', emoji: '🌙' },
     ];
 
     function renderChips() {
@@ -964,7 +958,7 @@
             <div class="search-empty-chips">
                 <button class="search-empty-chip" data-q="Arijit Singh" type="button">🎤 Arijit Singh</button>
                 <button class="search-empty-chip" data-q="90s Bollywood" type="button">🎵 90s Bollywood</button>
-                <button class="search-empty-chip" data-q="Taylor Swift" type="button">✨ Taylor Swift</button>
+                <button class="search-empty-chip" data-q="Kishore Kumar" type="button">👑 Kishore Kumar</button>
                 <button class="search-empty-chip" data-q="Lo-Fi Chill" type="button">🌙 Lo-Fi Chill</button>
             </div>
         </div>`;
@@ -1008,7 +1002,24 @@
         data.playlists.forEach((pl, i) => {
             const el = document.createElement('div');
             el.className = 'playlist-item';
-            el.textContent = pl.title;
+            const isSearch = pl.title.startsWith('Search:');
+            const icon = pl.icon || (isSearch ? '🔍' : '🎵');
+            const trackCount = (pl.tracks && Array.isArray(pl.tracks)) ? pl.tracks.length : 0;
+            const sub = isSearch ? 'Live Search Results' : `${trackCount} Songs • ${pl.category || 'Evergreen'}`;
+
+            el.innerHTML = `
+                <div class="pli-icon-wrap"><span>${icon}</span></div>
+                <div class="pli-meta">
+                    <span class="pli-title">${escapeHtml(pl.title)}</span>
+                    <span class="pli-sub">${escapeHtml(sub)}</span>
+                </div>
+                <div class="pli-now-playing" title="Playing">
+                    <span class="pli-bar"></span>
+                    <span class="pli-bar"></span>
+                    <span class="pli-bar"></span>
+                </div>
+            `;
+
             el.addEventListener('click', () => {
                 document.querySelectorAll('.playlist-item').forEach(x => x.classList.remove('active'));
                 el.classList.add('active');
