@@ -1,0 +1,39 @@
+{
+  "id": "https://mrps.in/",
+  "name": "MRPS MUSIC — Aesthetic Hindi Evergreen",
+  "short_name": "MRPS Music",
+  "description": "Aesthetic Hindi Evergreen music player with realistic vinyl turntable, glassmorphic UI, and ad-free playback.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#0a0a0c",
+  "orientation": "any",
+  "categories": ["music", "entertainment", "audio"],
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -7,27 +7,82 @@
     
 
     
-    // ─── Media Session API (Hardware Media Keys) ───
+    // ─── Media Session API (Android Auto, Vehicle Head Units & Media Keys) ───
     if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', () => {
-            if (ytPlayer && playerReady) {
-                ytPlayer.playVideo();
-            }
-        });
-        navigator.mediaSession.setActionHandler('pause', () => {
-            if (ytPlayer && playerReady) {
-                ytPlayer.pauseVideo();
-            }
-        });
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
-            if (!currentPl) return;
-            playTrack((currentIdx - 1 + currentPl.tracks.length) % currentPl.tracks.length);
-        });
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
-            if (!currentPl) return;
-            playTrack((currentIdx + 1) % currentPl.tracks.length);
-        });
+        try {
+            navigator.mediaSession.setActionHandler('play', () => {
+                if (ytPlayer && playerReady) {
+                    ytPlayer.playVideo();
+                }
+            });
+            navigator.mediaSession.setActionHandler('pause', () => {
+                if (ytPlayer && playerReady) {
+                    ytPlayer.pauseVideo();
+                }
+            });
+            navigator.mediaSession.setActionHandler('previoustrack', () => {
+                if (!currentPl) return;
+                playTrack((currentIdx - 1 + currentPl.tracks.length) % currentPl.tracks.length);
+            });
+            navigator.mediaSession.setActionHandler('nexttrack', () => {
+                if (!currentPl) return;
+                playTrack((currentIdx + 1) % currentPl.tracks.length);
+            });
+            navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                if (!ytPlayer || !playerReady) return;
+                const skip = (details && details.seekOffset) || 10;
+                try {
+                    const cur = ytPlayer.getCurrentTime() || 0;
+                    ytPlayer.seekTo(Math.max(0, cur - skip), true);
+                } catch (e) {}
+            });
+            navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                if (!ytPlayer || !playerReady) return;
+                const skip = (details && details.seekOffset) || 10;
+                try {
+                    const cur = ytPlayer.getCurrentTime() || 0;
+                    const dur = ytPlayer.getDuration() || 0;
+                    ytPlayer.seekTo(dur > 0 ? Math.min(dur, cur + skip) : cur + skip, true);
+                } catch (e) {}
+            });
+            navigator.mediaSession.setActionHandler('seekto', (details) => {
+                if (!ytPlayer || !playerReady || details.seekTime === undefined) return;
+                try {
+                    ytPlayer.seekTo(details.seekTime, true);
+                } catch (e) {}
+            });
+            navigator.mediaSession.setActionHandler('stop', () => {
+                if (ytPlayer && playerReady) {
+                    try { ytPlayer.pauseVideo(); } catch (e) {}
+                }
+                setPlaying(false);
+            });
+        } catch (err) {
+            console.warn('MediaSession handler registration failed:', err);
+        }
     }
+
+    // ─── Screen Wake Lock (Vehicle Dashboards & Mobile Driving) ───
+    let wakeLock = null;
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator && !wakeLock) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => { wakeLock = null; });
+            } catch (e) {}
+        }
+    }
+    function releaseWakeLock() {
+        if (wakeLock) {
+            try { wakeLock.release(); } catch (e) {}
+            wakeLock = null;
+        }
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && isPlaying) {
+            requestWakeLock();
+        }
+    });
 
     
     // ─── Mobile Audio Unlock ────────────────────
@@ -55,9 +110,10 @@
     const btnNext         = document.getElementById('btn-next');
     const iconPlay        = document.getElementById('icon-play');
     const iconPause       = document.getElementById('icon-pause');
-                const sidebar         = document.getElementById('sidebar');
+    const sidebar         = document.getElementById('sidebar');
     const sidebarBackdrop = document.getElementById('sidebar-backdrop');
     const queue           = document.getElementById('queue');
+    const queueBackdrop   = document.getElementById('queue-backdrop');
     const queueCount      = document.getElementById('queue-count');
     const btnMenu         = document.getElementById('btn-menu');
     
@@ -112,9 +168,20 @@
         progressInterval = setInterval(() => {
             if (ytPlayer && playerReady && isPlaying) {
                 try {
-                    const cur = ytPlayer.getCurrentTime();
-                    const dur = ytPlayer.getDuration();
+                    const cur = ytPlayer.getCurrentTime() || 0;
+                    const dur = ytPlayer.getDuration() || 0;
                     updateProgress(cur, dur);
+
+                    // Sync vehicle dashboard & Android Auto position scrubber
+                    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && dur > 0) {
+                        try {
+                            navigator.mediaSession.setPositionState({
+                                duration: Math.max(0, dur),
+                                playbackRate: 1,
+                                position: Math.min(Math.max(0, cur), dur)
+                            });
+                        } catch (err) {}
+                    }
                 } catch (e) {}
             }
         }, 350);
@@ -995,6 +1062,10 @@
         mobilePlName.textContent = searchPl.title;
         renderQueue();
         syncMeta();
+        if (window.innerWidth <= 900) {
+            sidebar.classList.remove('open');
+            if (sidebarBackdrop) sidebarBackdrop.classList.remove('open');
+        }
         if (playerReady) playTrack(startIdx);
     }
 
@@ -1026,6 +1097,7 @@
                 document.querySelectorAll('.playlist-item').forEach(x => x.classList.remove('active'));
                 el.classList.add('active');
                 sidebar.classList.remove('open');
+                if (sidebarBackdrop) sidebarBackdrop.classList.remove('open');
                 loadPlaylist(i);
             });
             playlistNav.appendChild(el);
@@ -1093,6 +1165,7 @@
                 playTrack(i);
                 if (window.innerWidth <= 900) {
                     queue.classList.remove('open');
+                    if (queueBackdrop) queueBackdrop.classList.remove('open');
                 }
             });
             trackList.appendChild(el);
@@ -1130,24 +1203,35 @@
     if (btnMenu) {
         btnMenu.addEventListener('click', () => {
             sidebar.classList.add('open');
+            if (sidebarBackdrop) sidebarBackdrop.classList.add('open');
         });
     }
 
     if (sidebarBackdrop) {
         sidebarBackdrop.addEventListener('click', () => {
             sidebar.classList.remove('open');
+            sidebarBackdrop.classList.remove('open');
         });
     }
 
     if (btnQueueMobile) {
         btnQueueMobile.addEventListener('click', () => {
-            queue.classList.toggle('open');
+            const isOpen = queue.classList.toggle('open');
+            if (queueBackdrop) queueBackdrop.classList.toggle('open', isOpen);
         });
     }
 
     if (btnCloseQueue) {
         btnCloseQueue.addEventListener('click', () => {
             queue.classList.remove('open');
+            if (queueBackdrop) queueBackdrop.classList.remove('open');
+        });
+    }
+
+    if (queueBackdrop) {
+        queueBackdrop.addEventListener('click', () => {
+            queue.classList.remove('open');
+            queueBackdrop.classList.remove('open');
         });
     }
 
@@ -1180,15 +1264,27 @@
             diskLabel.style.backgroundPosition = 'center';
         }
         
-        // Update OS Media Session (Lock Screen / Media Keys)
+        // Update OS Media Session (Android Auto / Vehicle Head Units / Lock Screen)
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: displayTitle,
-                artist: displayArtist,
-                artwork: [
-                    { src: thumb || 'https://via.placeholder.com/600', sizes: '600x600', type: 'image/jpeg' }
-                ]
-            });
+            const albumName = (currentPl && currentPl.title) || 'Hindi Evergreen Classics';
+            const baseArt = thumb || 'https://via.placeholder.com/600';
+            try {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: displayTitle,
+                    artist: displayArtist,
+                    album: albumName,
+                    artwork: [
+                        { src: baseArt, sizes: '96x96',   type: 'image/jpeg' },
+                        { src: baseArt, sizes: '128x128', type: 'image/jpeg' },
+                        { src: baseArt, sizes: '192x192', type: 'image/jpeg' },
+                        { src: baseArt, sizes: '256x256', type: 'image/jpeg' },
+                        { src: baseArt, sizes: '384x384', type: 'image/jpeg' },
+                        { src: baseArt, sizes: '512x512', type: 'image/jpeg' },
+                        { src: baseArt, sizes: '600x600', type: 'image/jpeg' }
+                    ]
+                });
+                navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+            } catch (err) {}
         }
 
         // Highlight active queue item
@@ -1303,10 +1399,19 @@
         iconPlay.style.display  = val ? 'none' : 'block';
         iconPause.style.display = val ? 'block' : 'none';
         document.body.classList.toggle('is-playing', val);
+
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.playbackState = val ? 'playing' : 'paused';
+            } catch (e) {}
+        }
+
         if (val) {
             startProgressTicker();
+            requestWakeLock();
         } else {
             stopProgressTicker();
+            releaseWakeLock();
         }
     }
 

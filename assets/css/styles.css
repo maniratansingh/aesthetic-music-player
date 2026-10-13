@@ -19,8 +19,29 @@
    RESET
 ───────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; background: #000; color: var(--text); font-family: 'Inter', -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
-button { cursor: pointer; font: inherit; background: none; border: none; color: inherit; }
+html, body {
+    height: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+    background: #000;
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+button, input {
+    font: inherit;
+    color: inherit;
+}
+button {
+    cursor: pointer;
+    background: none;
+    border: none;
+    touch-action: manipulation;
+}
 
 /* ─────────────────────────────────────────────
    WEBGL CANVAS
@@ -30,6 +51,7 @@ button { cursor: pointer; font: inherit; background: none; border: none; color: 
     inset: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     z-index: 0;
     pointer-events: none;
 }
@@ -42,6 +64,7 @@ button { cursor: pointer; font: inherit; background: none; border: none; color: 
     z-index: 1;
     display: flex;
     height: 100vh;
+    height: 100dvh;
     padding: 16px;
     gap: 12px;
 }
@@ -802,35 +825,51 @@ button { cursor: pointer; font: inherit; background: none; border: none; color: 
         padding: 0;
         gap: 0;
         overflow: hidden;
+        height: 100vh;
+        height: 100dvh;
     }
 
-    /* Sidebar becomes a slide-in drawer */
+    /* Sidebar becomes a slide-in drawer with safe-area padding */
     .sidebar {
         position: fixed;
-        inset: 0;
-        z-index: 50;
-        width: 80vw;
-        max-width: 300px;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 60;
+        width: 82vw;
+        max-width: 320px;
         border-radius: 0;
         border-right: 1px solid var(--glass-border);
         transform: translateX(-100%);
-        transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+        transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+        padding-top: max(16px, env(safe-area-inset-top, 0px));
+        padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
     }
 
-    .sidebar.open { transform: translateX(0); }
+    .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
+    }
 
     .sidebar-backdrop {
-        display: block;
+        display: none;
         position: fixed;
         inset: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 49;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 55;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.3s;
+        transition: opacity 0.3s ease;
     }
 
-    .sidebar.open .sidebar-backdrop { opacity: 1; pointer-events: all; }
+    .sidebar-backdrop.open {
+        display: block;
+        opacity: 1;
+        pointer-events: all;
+    }
 
     /* Player takes full screen */
     .player {
@@ -839,9 +878,10 @@ button { cursor: pointer; font: inherit; background: none; border: none; color: 
         min-height: 0;
         border-radius: 0;
         border: none;
-        padding: 0 20px 20px;
+        padding: 0 16px max(18px, env(safe-area-inset-bottom, 0px));
         justify-content: flex-start;
         padding-top: 0;
+        overflow-x: hidden;
         gap: 0;
     }
 
@@ -851,51 +891,105 @@ button { cursor: pointer; font: inherit; background: none; border: none; color: 
         align-items: center;
         justify-content: space-between;
         width: 100%;
-        padding: 14px 4px 10px;
+        padding: max(12px, env(safe-area-inset-top, 0px)) 4px 8px;
         flex-shrink: 0;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
 
     .mobile-bar span {
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.6px;
         color: var(--text-dim);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 60%;
+        text-align: center;
     }
 
-    /* Queue becomes bottom sheet */
+    /* Queue becomes bottom sheet with safe-area padding */
     .queue {
         position: fixed;
         left: 0; right: 0; bottom: 0;
         width: 100%;
-        height: 75vh;
-        z-index: 40;
-        border-radius: 20px 20px 0 0;
+        height: 78vh;
+        height: 78dvh;
+        z-index: 60;
+        border-radius: 24px 24px 0 0;
         transform: translateY(100%);
-        transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+        transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         border: none;
         border-top: 1px solid var(--glass-border);
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.85);
+        padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
     }
 
-    .queue.open { transform: translateY(0); }
+    .queue.open {
+        transform: translateY(0);
+    }
+
+    .queue-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 55;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .queue-backdrop.open {
+        display: block;
+        opacity: 1;
+        pointer-events: all;
+    }
+
     #btn-close-queue { display: flex; }
 
     /* Compact spacing on mobile */
     .disk-wrap {
-        --d: clamp(160px, 36vw, 260px);
-        margin-bottom: clamp(10px, 2vh, 20px);
-        margin-top: 8px;
+        --d: clamp(170px, 42vw, 250px);
+        margin-bottom: clamp(10px, 2.5vh, 20px);
+        margin-top: 6px;
     }
 
     .tonearm, .tonearm-base {
-        scale: 0.85;
+        scale: 0.82;
     }
 
-    .meta { margin-bottom: clamp(10px, 2vh, 20px); }
+    .meta {
+        margin-bottom: clamp(10px, 2vh, 18px);
+        max-width: 90vw;
+    }
 
-    .controls { gap: 24px; }
-    .ctrl.play { width: 58px; height: 58px; }
+    .controls { gap: 20px; }
+    .ctrl.play { width: 56px; height: 56px; }
+}
+
+/* Extra compact mobile phones & landscape orientation */
+@media (max-width: 480px) {
+    .disk-wrap {
+        --d: clamp(145px, 46vw, 210px);
+        margin-top: 2px;
+        margin-bottom: 8px;
+    }
+    .tonearm, .tonearm-base {
+        scale: 0.74;
+    }
+    .meta-title {
+        font-size: 1.15rem;
+    }
+    .meta-artist {
+        font-size: 0.84rem;
+    }
+    .controls { gap: 16px; }
+    .ctrl { width: 44px; height: 44px; }
+    .ctrl.play { width: 52px; height: 52px; }
 }
 
 /* ─── Volume Slider ─── */

@@ -2,9 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MRPS Music</title>
-    <link rel="stylesheet" href="assets/css/styles.css?v=79">
+    <meta name="description" content="Aesthetic Hindi Evergreen music player with realistic vinyl turntable, glassmorphic UI, and ad-free streaming.">
+    <meta name="theme-color" content="#0a0a0c">
+    <meta name="color-scheme" content="dark">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MRPS Music">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="MRPS Music">
+    <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="assets/css/styles.css?v=80">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -48,8 +59,8 @@
 
                 <nav id="playlist-nav"></nav>
             </div>
-            <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
         </aside>
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
         <!-- PLAYER -->
         <main class="player" id="player">
@@ -142,15 +153,16 @@
             </div>
             <div class="queue-list" id="track-list"></div>
         </aside>
+        <div class="queue-backdrop" id="queue-backdrop"></div>
     </div>
 
     <div id="yt-player-container" class="yt-audio-frame">
         <div id="yt-player"></div>
     </div>
 
-    <script src="assets/js/data.js?v=79"></script>
+    <script src="assets/js/data.js?v=80"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="assets/js/shader.js?v=79"></script>
-    <script src="assets/js/app.js?v=79"></script>
+    <script src="assets/js/shader.js?v=80"></script>
+    <script src="assets/js/app.js?v=80"></script>
 </body>
 </html>
