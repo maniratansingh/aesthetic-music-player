@@ -721,6 +721,9 @@
         const q = (query || '').trim();
         if (!q) return [];
 
+        // Priority safety: Search curated catalog for verified videoIds
+        const localMatches = searchLocalCatalog(q) || [];
+
         // Tier 1: Direct iTunes Fetch (Fastest)
         try {
             const controller = new AbortController();
@@ -731,7 +734,7 @@
             if (res.ok) {
                 const json = await res.json();
                 if (json && json.results && json.results.length) {
-                    return json.results;
+                    return localMatches.concat(json.results);
                 }
             }
         } catch (e) {
@@ -742,7 +745,7 @@
         try {
             const json = await fetchItunesJsonp(q, 40);
             if (json && json.results && json.results.length) {
-                return json.results;
+                return localMatches.concat(json.results);
             }
         } catch (e) {
             // JSONP failed or timed out
@@ -759,7 +762,7 @@
             if (res.ok) {
                 const json = await res.json();
                 if (json && json.results && json.results.length) {
-                    return json.results;
+                    return localMatches.concat(json.results);
                 }
             }
         } catch (e) {
@@ -767,7 +770,6 @@
         }
 
         // Tier 4: Local catalog search (Offline & safety net)
-        const localMatches = searchLocalCatalog(q);
         if (localMatches && localMatches.length) {
             return localMatches;
         }
@@ -1233,13 +1235,13 @@
             return;
         }
 
-        // 3. Search Track Audio Resolution (No skip loops, no repeated ads)
+        // 3. Clean Direct Audio Stream Resolution (NO listType:'search' background ads)
         const cleanT = clean(t.title);
         const cleanA = (t.artist || '').split('&')[0].split(',')[0].trim();
-        const searchQ = `${cleanT} ${cleanA} audio`.trim();
+        const searchQ = `${cleanT} ${cleanA}`.trim();
         const cacheKey = `mrps_vid_${cleanT}_${cleanA}`.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
-        // Check localStorage cache
+        // A. Check localStorage cache
         try {
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
@@ -1250,44 +1252,50 @@
             }
         } catch (e) {}
 
-        // Fast endpoint check with 1.8s timeout
+        // B. Check curated catalog for instant verified match
+        const localMatches = searchLocalCatalog(cleanT);
+        if (localMatches && localMatches.length && localMatches[0].videoId) {
+            const matchedVid = localMatches[0].videoId;
+            t.videoId = matchedVid;
+            try { localStorage.setItem(cacheKey, matchedVid); } catch (e) {}
+            ytPlayer.loadVideoById(matchedVid);
+            ytPlayer.playVideo();
+            return;
+        }
+
+        // C. Fast Piped music songs check (Single tracks only, no compilations/ads)
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 1800);
-            const instances = [
-                'https://invidious.f5.si',
-                'https://yt.chocolatemoo53.com'
-            ];
-            let foundVid = null;
-            for (const url of instances) {
-                try {
-                    const res = await fetch(`${url}/api/v1/search?q=${encodeURIComponent(searchQ)}`, { signal: controller.signal });
-                    if (!res.ok) continue;
-                    const data = await res.json();
-                    if (data && data.length > 0 && data[0].videoId) {
-                        foundVid = data[0].videoId;
-                        break;
-                    }
-                } catch (e) {}
-            }
+            const timeoutId = setTimeout(() => controller.abort(), 2400);
+            const pipedRes = await fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(searchQ)}&filter=music_songs`, { signal: controller.signal });
             clearTimeout(timeoutId);
-
-            if (foundVid) {
-                t.videoId = foundVid;
-                try { localStorage.setItem(cacheKey, foundVid); } catch (e) {}
-                ytPlayer.loadVideoById(foundVid);
-                ytPlayer.playVideo();
-                return;
+            if (pipedRes.ok) {
+                const data = await pipedRes.json();
+                const items = data && (data.items || data);
+                if (Array.isArray(items) && items.length > 0) {
+                    for (const it of items) {
+                        const u = it.url || '';
+                        const vidMatch = u.match(/v=([a-zA-Z0-9_-]{11})/);
+                        if (vidMatch && vidMatch[1]) {
+                            const foundVid = vidMatch[1];
+                            t.videoId = foundVid;
+                            try { localStorage.setItem(cacheKey, foundVid); } catch (e) {}
+                            ytPlayer.loadVideoById(foundVid);
+                            ytPlayer.playVideo();
+                            return;
+                        }
+                    }
+                }
             }
         } catch (err) {}
 
-        // Guaranteed fallback: Native YouTube IFrame Search (runs inside player without CORS errors)
-        try {
-            ytPlayer.loadPlaylist({ listType: 'search', list: searchQ, index: 0 });
-            ytPlayer.playVideo();
-        } catch (e) {
-            console.error('Playback could not be initiated:', e);
-        }
+        // Safe Fallback: NEVER load deprecated listType: 'search' (it creates background ads and random videos)
+        console.warn(`Direct audio stream could not be resolved for "${t.title}". Skipping to next track.`);
+        setTimeout(() => {
+            if (currentPl && currentPl.tracks.length > 1) {
+                playTrack((currentIdx + 1) % currentPl.tracks.length);
+            }
+        }, 600);
     }
 
     function setPlaying(val) {
@@ -1460,26 +1468,16 @@
         console.warn('YouTube Player error code:', e && e.data);
         consecutiveErrors++;
         if (consecutiveErrors >= 3) {
-            console.error('Multiple consecutive playback errors. Pausing to stop ad loop.');
+            console.error('Multiple consecutive playback errors. Pausing playback.');
             setPlaying(false);
             return;
         }
 
-        const t = currentPl && currentPl.tracks[currentIdx];
-        if (t) {
-            const cleanT = clean(t.title);
-            const cleanA = (t.artist || '').split('&')[0].split(',')[0].trim();
-            try {
-                ytPlayer.loadPlaylist({ listType: 'search', list: `${cleanT} ${cleanA} audio`, index: 0 });
-                ytPlayer.playVideo();
-                return;
-            } catch (err) {}
-        }
-
+        // Seamlessly advance to the next track without opening ad-filled search playlists
         setTimeout(() => {
             if (!currentPl) return;
             playTrack((currentIdx + 1) % currentPl.tracks.length);
-        }, 1500);
+        }, 600);
     }
 
     function onState(e) {
@@ -1494,9 +1492,8 @@
             const isAd = (dur > 0 && dur <= 35 && (!vd || !vd.author || vd.author === ''));
 
             if (isAd) {
-                // Accelerate ad to 2x speed to get through it fast
+                // Accelerate ad to 2x speed to get through it fast (without illegal seekTo which causes ad reload loops)
                 try { ytPlayer.setPlaybackRate(2); } catch (err) {}
-                try { ytPlayer.seekTo(dur, true); } catch (err) {}
             } else {
                 // Ensure standard speed for real music
                 try { ytPlayer.setPlaybackRate(1); } catch (err) {}

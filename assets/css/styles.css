@@ -2145,3 +2145,18 @@ body.is-muted .mute-btn-standalone:hover {
     }
 }
 
+/* ─── YOUTUBE AUDIO ENGINE FRAME ─── */
+.yt-audio-frame {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    width: 240px;
+    height: 140px;
+    opacity: 0.001;
+    pointer-events: none;
+    z-index: -10;
+    overflow: hidden;
+    border-radius: 8px;
+    transform: translateZ(0);
+}
+
