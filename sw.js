@@ -40,7 +40,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // Bypass external streaming / API calls (YouTube, Apple iTunes, Piped)
+    // Network-only for external streaming / API calls (YouTube, Apple iTunes, Piped)
     if (url.origin !== location.origin) {
         return;
     }

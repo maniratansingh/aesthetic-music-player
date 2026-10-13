@@ -808,7 +808,7 @@
             // Direct fetch failed or blocked
         }
 
-        // Tier 2: Apple JSONP via dynamic <script> (Bypasses CORS & adblockers)
+        // Tier 2: Apple JSONP via dynamic <script> (Cross-origin safe)
         try {
             const json = await fetchItunesJsonp(q, 40);
             if (json && json.results && json.results.length) {
@@ -1331,7 +1331,7 @@
             return;
         }
 
-        // 3. Clean Direct Audio Stream Resolution (NO listType:'search' background ads)
+        // 3. Clean Direct Audio Stream Resolution
         const cleanT = clean(t.title);
         const cleanA = (t.artist || '').split('&')[0].split(',')[0].trim();
         const searchQ = `${cleanT} ${cleanA}`.trim();
@@ -1359,7 +1359,7 @@
             return;
         }
 
-        // C. Fast Piped music songs check (Single tracks only, no compilations/ads)
+        // C. Fast Piped music songs check (Single tracks only)
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2400);
@@ -1385,7 +1385,7 @@
             }
         } catch (err) {}
 
-        // Safe Fallback: NEVER load deprecated listType: 'search' (it creates background ads and random videos)
+        // Safe Fallback: Skip track gracefully if direct audio stream cannot be resolved
         console.warn(`Direct audio stream could not be resolved for "${t.title}". Skipping to next track.`);
         setTimeout(() => {
             if (currentPl && currentPl.tracks.length > 1) {
@@ -1537,7 +1537,7 @@
         }, { passive: true });
     }
 
-    // ─── YouTube IFrame API (Ad-Mitigated & Error 150 Safe) ──────
+    // ─── Embedded Media Player API ──────
     window.onYouTubeIframeAPIReady = function () {
         ytPlayer = new YT.Player('yt-player', {
             height: '240',
@@ -1578,7 +1578,7 @@
             return;
         }
 
-        // Seamlessly advance to the next track without opening ad-filled search playlists
+        // Advance to the next track in the queue
         setTimeout(() => {
             if (!currentPl) return;
             playTrack((currentIdx + 1) % currentPl.tracks.length);
@@ -1591,18 +1591,7 @@
             setPlaying(true);
             startProgressTicker();
 
-            // Detect if an ad is playing (short duration <= 35s or missing author)
-            const dur = ytPlayer.getDuration() || 0;
-            const vd = ytPlayer.getVideoData();
-            const isAd = (dur > 0 && dur <= 35 && (!vd || !vd.author || vd.author === ''));
-
-            if (isAd) {
-                // Accelerate ad to 2x speed to get through it fast (without illegal seekTo which causes ad reload loops)
-                try { ytPlayer.setPlaybackRate(2); } catch (err) {}
-            } else {
-                // Ensure standard speed for real music
-                try { ytPlayer.setPlaybackRate(1); } catch (err) {}
-            }
+            try { ytPlayer.setPlaybackRate(1); } catch (err) {}
 
             const curTrack = currentPl && currentPl.tracks[currentIdx];
             if (vd && vd.title) {

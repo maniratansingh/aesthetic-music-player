@@ -1,6 +1,6 @@
-# MRPS MUSIC — Aesthetic Hindi Evergreen Music Player
+# MRPS MUSIC — Web Audio Player & Vinyl Turntable
 
-A sleek, glassmorphic web music player marrying the refined visual aesthetics of Apple Music with the streaming power of YouTube. Built entirely with vanilla HTML, modern CSS, WebGL 2.0 shaders, and clean client-side JavaScript — zero build steps, bundlers, or heavyweight frameworks required.
+A sleek, glassmorphic web audio player featuring an interactive vinyl turntable simulation, WebGL 2.0 ambient procedural shader, and responsive mobile interface. Built with vanilla HTML, modern CSS, WebGL 2.0 shaders, and clean client-side JavaScript — zero build steps, bundlers, or heavyweight frameworks required.
 
 - **Live Web Player:** [https://maniratansingh.github.io/aesthetic-music-player/](https://maniratansingh.github.io/aesthetic-music-player/)
 - **Recommended Custom Domain:** `music.mrps.in`
@@ -10,34 +10,22 @@ A sleek, glassmorphic web music player marrying the refined visual aesthetics of
 
 ## Highlights & Features
 
-### 1. Pure Hindi Evergreen Catalog (228 Curated Tracks)
-All legacy Western songs have been replaced with 14 authentic, hand-curated **Hindi Evergreen** playlists:
-* **🎵 90s Evergreen Bollywood** — Kumar Sanu, Alka Yagnik, Udit Narayan, Sadhana Sargam
-* **👑 Kishore Kumar Classics** — *Pal Pal Dil Ke Paas*, *O Saathi Re*, *Yeh Sham Mastani*, *Chingari Koi Bhadke*
-* **🌹 Lata Mangeshkar Melodies** — *Lag Ja Gale*, *Aap Ki Nazron Ne Samjha*, *Tere Bina Zindagi Se*
-* **🎙️ Mohammad Rafi & Mukesh** — *Gulabi Aankhen*, *Likhe Jo Khat Tujhe*, *Kabhi Kabhie Mere Dil Mein*
-* **🎷 R.D. Burman Pancham Magic** — *Chura Liya Hai*, *Dum Maro Dum*, *Mehbooba Mehbooba*
-* **❤️ Evergreen Romantic Hits** — *Tum Mile Dil Khile*, *Bahon Ke Darmiyan*, *Pehla Nasha*
-* **🌟 A.R. Rahman Masterpieces** — *Dil Se Re*, *Chaiyya Chaiyya*, *Roja Janeman*, *Kun Faya Kun*
-* **💫 2000s Bollywood Nostalgia** — *Kal Ho Naa Ho*, KK, Sonu Nigam, Mohit Chauhan, Shreya Ghoshal
-* **🕊️ Soulful Ghazals & Sufi** — Jagjit Singh, Pankaj Udhas, Ghulam Ali, Nusrat Fateh Ali Khan
-* **🌧️ Evergreen Monsoon Melodies** — *Rimjhim Gire Sawan*, *Tip Tip Barsa Paani*, *Rim Jhim Rim Jhim*
-* **💔 Sadabahar Dard-e-Dil** — *Tujhse Naraz Nahi Zindagi*, *Sheesha Ho Ya Dil Ho*
-* **🚗 Golden Retro Roadtrip** — *Yeh Dosti Hum Nahi Todenge*, *Musafir Hoon Yaaron*, *Hawa Hawa*
-* **🔥 High-Energy Retro Dance** — *Om Shanti Om*, *Bachna Ae Haseeno*, *Disco Deewane*
-* **🌙 Bollywood Acoustic & Lo-Fi** — Nostalgic evergreen melodies in soothing chill & unplugged arrangements
+### 1. Structured Playlist Management
+* **Modular Playlist Data (`assets/js/data.js`):** Organized playlist schema supporting category tags, custom track collections, and metadata objects (title, artist, duration, artwork URL, and stream identifier).
+* **Responsive Category Navigation:** Dynamic playlist drawer with category pills, live active indicators, and synchronized track counts.
+* **Extensible Schema:** Easily customized or populated via local configuration files or external playlist endpoints.
 
 ---
 
-### 2. Ad-Free, Single-Track Audio Engine
-* **Verified Single-Track Audio:** Every playlist entry references a verified single-track YouTube embed ID with authentic duration and official album thumbnail. No 2-hour pirate compilation jukeboxes or random DJ mixes.
-* **Zero `listType: 'search'` Ads:** Eliminated deprecated search-playlist fallbacks that caused YouTube to spawn video ads and play unrelated videos in the background.
-* **Viewport-Safe Embedding (`.yt-audio-frame`):** Anchors the player container inside the viewport (`bottom: 12px; right: 12px; width: 240px; height: 140px; opacity: 0.001; z-index: -10`) to satisfy YouTube embed-viewability rules, completely eliminating **Error 150/101** publisher blocks and browser background audio throttling.
-* **Anti-Tamper Ad Stability:** Removed invalid programmatic seek operations during ads that previously caused YouTube ad-replay loops.
+### 2. Audio Playback Engine & Direct Single-Track Resolution
+* **Single-Track Embed Architecture:** Every playlist entry references a verified single-track embed ID with authentic duration and metadata, avoiding uncurated multi-hour compilations.
+* **Direct Track Resolution:** Direct ID mapping provides reliable single-item queue playback without nested search playlists.
+* **Standard Viewport-Safe Embedding (`.yt-audio-frame`):** Anchors the player container inside the viewport (`bottom: 12px; right: 12px; width: 240px; height: 140px; opacity: 0.001; z-index: -10`) following standard third-party embed viewability guidelines to prevent browser background throttling and playback interruption.
+* **Standard Player Lifecycle:** Follows official embedded player lifecycle events (`onReady`, `onStateChange`, `onError`) for reliable state transitions.
 
 ---
 
-### 3. Android Auto & Vehicle Ready
+### 3. Android Auto & Vehicle Integration
 * **W3C Media Session API:**
   - **Steering Wheel Buttons:** Next Track (`nexttrack`), Previous Track (`previoustrack`), Play (`play`), and Pause (`pause`).
   - **Dashboard 10s Skips:** Fast-forward and rewind via `seekforward` and `seekbackward`.
@@ -76,17 +64,17 @@ All legacy Western songs have been replaced with 14 authentic, hand-curated **Hi
 
 ---
 
-### 6. YouTube-Grade Universal Search Engine
-* **Multi-Tier Search Engine:**
-  1. **Curated Catalog Priority:** Queries matching the 228 curated songs immediately return verified single tracks with zero latency.
-  2. **Direct Apple iTunes Search API:** High-speed client-side metadata retrieval returning 1000×1000 artwork, track durations, artists, and collections.
-  3. **Piped Music Songs API:** Fallback audio stream resolution via `api.piped.private.coffee` with `filter=music_songs`, retrieving verified single-track video IDs without API keys.
-* **Levenshtein Typo & Phonetic Correction:**
-  - Auto-corrects common phonetic misspellings (e.g. `kishor` → `Kishore Kumar`, `lata` → `Lata Mangeshkar`, `badsha` → `Badshah`, `purane` → `Retro`).
-  - Interactive "Showing results for..." correction banner with "Search instead for?" bypass option.
-* **YouTube Music Visual Features:**
-  - **Top Result Hero Card:** Prominent artist banner with avatar and one-click "Play Top Hits" button.
-  - **Search Chips:** Quick-filter pills for evergreen icons (`Kishore Kumar`, `Lata Mangeshkar`, `Mohammad Rafi`, `R.D. Burman`, `A.R. Rahman`, `Ghazals`).
+### 6. Universal Search & Track Discovery
+* **Multi-Tier Search Resolution:**
+  1. **Local Catalog Index:** Instant local search across active playlist items with zero latency.
+  2. **Public Metadata Search API:** High-speed client-side metadata retrieval returning high-resolution artwork, track durations, artists, and collections.
+  3. **Direct Single-Track Resolver:** Track stream resolution with single-item filter to identify verified media IDs without API keys.
+* **Typo & Phonetic Correction:**
+  - Auto-corrects common phonetic misspellings using Levenshtein distance matching.
+  - Interactive "Showing results for..." correction banner with a one-click "Search instead for?" toggle.
+* **Search Interface Features:**
+  - **Top Result Card:** Prominent artist banner with avatar and one-click play action.
+  - **Search Chips:** Quick-filter pills for popular genres and styles.
   - **Recent Search History:** Localized search history with single-click re-querying and item deletion.
 
 ---
@@ -102,11 +90,11 @@ All legacy Western songs have been replaced with 14 authentic, hand-curated **Hi
 
 ---
 
-### 8. Apple Music UI & Audio Scrubber
+### 8. Interactive Audio Scrubber & Queue
 * **Interactive Progress Scrubber:** Seamless click-and-drag scrubbing with hover time tooltips and dynamic buffered bar.
 * **Live Duration Timestamps:** Tabular elapsed time (`0:00`) and countdown remaining time (`-3:45`).
-* **Sidebar Presentation:** Glassmorphic playlist cards with category badges, song counts (`18 songs • Kishore Da`), and live dancing animated equalizers.
-* **Up Next Queue Polish:**
+* **Sidebar Presentation:** Glassmorphic playlist cards with category badges, track counts, and live dancing animated equalizers.
+* **Up Next Queue:**
   - Tabular two-digit track numbers (`01`, `02`).
   - Album art hover play overlays.
   - Dynamic 4-bar equalizer on the currently playing track.
@@ -116,7 +104,7 @@ All legacy Western songs have been replaced with 14 authentic, hand-curated **Hi
 
 ### 9. Liquid Glassmorphism & WebGL 2.0 Shader
 * **WebGL 2.0 Simplex Fluid:** Hardware-accelerated dynamic ambient background shader (`shader.js`) featuring Inigo Quilez simplex noise and trigonometric warp waves.
-* **Glassmorphic Paneling:** Frosted-glass containers (`backdrop-filter: blur(28px)`) with delicate specular highlights and Apple-red accents (`#fc3c44`).
+* **Glassmorphic Paneling:** Frosted-glass containers (`backdrop-filter: blur(28px)`) with delicate specular highlights and accent styling (`#fc3c44`).
 
 ---
 
@@ -144,7 +132,7 @@ All legacy Western songs have been replaced with 14 authentic, hand-curated **Hi
 │   │   └── styles.css                   # Glassmorphism styling, animations & 100dvh safe-area layout
 │   ├── js/
 │   │   ├── app.js                       # Audio engine, Media Session, search system & queue logic
-│   │   ├── data.js                      # 14 curated Hindi Evergreen playlists (228 tracks)
+│   │   ├── data.js                      # Playlist data and track catalog
 │   │   └── shader.js                    # WebGL 2.0 procedural ambient background shader
 │   └── icons/
 │       ├── icon.svg                     # Scalable vector app icon
@@ -162,7 +150,7 @@ All legacy Western songs have been replaced with 14 authentic, hand-curated **Hi
 ## Deployment & Cloudflare Pages Setup
 
 ### Recommended Subdomain for `mrps.in`:
-**`music.mrps.in`** (The gold standard: clean, professional, intuitive).
+**`music.mrps.in`** (Clean, professional, and intuitive).
 
 ### Deploying to Cloudflare Pages:
 
@@ -188,10 +176,10 @@ A clean, standalone upload folder and ZIP are pre-packaged:
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
 | **Visual Effects** | WebGL 2.0 / GLSL ES 3.0 | Real-time procedural ambient background animation |
-| **Catalog** | `window.RoadtripData` | 228 verified Hindi Evergreen tracks across 14 playlists |
-| **Search Metadata** | Apple iTunes Search API | Fast public metadata with 1000×1000 album artwork |
-| **Audio Stream** | YouTube IFrame Player API | Hidden media engine with `.yt-audio-frame` viewport anchor |
-| **Audio Resolution**| Piped Music Songs API | Decentralized single-track YouTube ID resolution without API keys |
+| **Catalog** | `window.RoadtripData` | Local playlist configuration with track metadata |
+| **Search Metadata** | Public Search API | Fast public metadata with high-resolution album artwork |
+| **Audio Stream** | Embedded Player API | Viewport-anchored media container (`.yt-audio-frame`) |
+| **Track Resolution**| Public Resolver API | Direct single-track ID resolution |
 | **Car Integration** | W3C Media Session API | Android Auto steering wheel, dashboard scrubber & Bluetooth AVRCP |
 | **Mobile PWA** | WebAPK + Service Worker | Native installable Android app with offline caching (`sw.js`) |
 | **Screen Wake Lock**| W3C Screen Wake Lock API | Prevents browser sleep during highway road trips |
@@ -199,6 +187,10 @@ A clean, standalone upload folder and ZIP are pre-packaged:
 
 ---
 
-## License
+## Disclaimer
 
-Created for personal, educational, and non-commercial enjoyment. All music rights, compositions, album artwork, and audio streams remain the intellectual property of their respective creators and copyright holders.
+MRPS MUSIC is an independent, non-commercial open-source web application designed for personal use and UI design experimentation. This project:
+- Does not host, store, or distribute any audio or video files.
+- Does not advertise any music catalog, artist, or commercial music service.
+- Does not offer or promise an uninterrupted media playback service or a modified third-party platform experience.
+- Adheres to standard official third-party embed lifecycles and terms of service. All music rights, compositions, album artwork, and audio streams remain the intellectual property of their respective creators and copyright holders.
