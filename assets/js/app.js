@@ -141,17 +141,135 @@
 
     let searchDebounce     = null;
     let currentSearchResults = [];
+    let activeNavIdx       = -1;
+    let lastExecutedQuery  = '';
 
-    // ─── Quick pick recommendation chips ─────────
+    // ─── Curated Knowledge Base for YouTube-Grade Suggestions ───
+    const POPULAR_RECOMMENDATIONS = [
+        // Bollywood Legends & Modern Artists
+        { query: 'Arijit Singh', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/bf/14/08/bf14088a-9f57-b08e-1f7c-7f5fb2b24da8/190295851248.jpg/200x200bb.jpg' },
+        { query: 'Arijit Singh romantic songs', category: 'Top Hits' },
+        { query: 'Arijit Singh sad songs', category: 'Top Hits' },
+        { query: 'Kishore Kumar', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/4a/60/d1/4a60d131-08ec-be77-8cbe-3ca4bfcb6630/8902894354228_cover.jpg/200x200bb.jpg' },
+        { query: 'Kishore Kumar classics', category: 'Top Hits' },
+        { query: 'Lata Mangeshkar', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/37/a3/bb/37a3bbd5-1815-5cb9-8e7c-b3624e54546a/8902894354259_cover.jpg/200x200bb.jpg' },
+        { query: 'Mohammad Rafi', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/7e/3d/c0/7e3dc04c-d90c-b26a-6569-8d82d46e279a/8902894354266_cover.jpg/200x200bb.jpg' },
+        { query: 'Mukesh', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/fa/ec/9b/faec9be9-a5e2-0ce2-1ff6-e0e643ae4be8/8902894354273_cover.jpg/200x200bb.jpg' },
+        { query: 'A.R. Rahman', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/28/fc/2a/28fc2afb-873b-eb63-12ce-131c944111be/886445591322.jpg/200x200bb.jpg' },
+        { query: 'R.D. Burman', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/43/d8/d7/43d8d7b3-8186-0927-4ee5-4b08709ca8ae/8902894354280_cover.jpg/200x200bb.jpg' },
+        { query: 'Kumar Sanu & Alka Yagnik', category: 'Top Hits' },
+        { query: 'Udit Narayan', category: 'Artist' },
+        { query: 'Shreya Ghoshal', category: 'Artist' },
+        { query: 'Sonu Nigam', category: 'Artist' },
+        { query: 'Atif Aslam', category: 'Artist' },
+        { query: 'Jagjit Singh Ghazals', category: 'Genre' },
+        { query: 'Diljit Dosanjh', category: 'Artist' },
+        { query: 'Sidhu Moose Wala', category: 'Artist' },
+        { query: '90s Evergreen Bollywood', category: 'Playlist' },
+        { query: 'Romantic Bollywood Songs', category: 'Mood' },
+        { query: 'Lo-Fi Chill Hindi', category: 'Vibe' },
+        { query: 'Punjabi Party Hits', category: 'Vibe' },
+        { query: 'Taylor Swift', category: 'Artist', avatar: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/4b/f7/a9/4bf7a944-fb43-6c84-8848-18e4cf24c4e2/24UMGIM28751.rgb.jpg/200x200bb.jpg' },
+        { query: 'The Weeknd', category: 'Artist' },
+        { query: 'Ed Sheeran', category: 'Artist' },
+        { query: 'Coldplay', category: 'Artist' },
+        { query: 'Eminem', category: 'Artist' },
+        { query: 'Dua Lipa', category: 'Artist' },
+        { query: 'Billie Eilish', category: 'Artist' },
+    ];
+
+    // ─── Extensive Typo Normalization & Phonetic Dictionary ──────
+    const TYPO_MAP = {
+        'arijt': 'arijit', 'arjit': 'arijit', 'arjith': 'arijit', 'arijitsingh': 'arijit',
+        'atif': 'atif', 'aatif': 'atif', 'aslm': 'aslam', 'aslum': 'aslam',
+        'kishor': 'kishore', 'kumaar': 'kumar', 'kishoreda': 'kishore',
+        'lataji': 'lata', 'mangeshkar': 'mangeshkar', 'mangshkar': 'mangeshkar',
+        'rafi': 'mohammad rafi', 'mohd': 'mohammad', 'md': 'mohammad', 'mohammed': 'mohammad',
+        'mukeshji': 'mukesh',
+        'pancham': 'r d burman', 'rd': 'r d', 'burman': 'burman',
+        'sanu': 'kumar sanu', 'shanu': 'kumar sanu',
+        'yagnik': 'alka yagnik', 'alkaji': 'alka yagnik',
+        'narayan': 'udit narayan',
+        'ghoshal': 'shreya ghoshal', 'ghosal': 'shreya ghoshal',
+        'sonu': 'sonu nigam', 'nigm': 'nigam',
+        'jagjit': 'jagjit singh',
+        'badsha': 'badshah', 'badshsh': 'badshah',
+        'honey': 'yo yo honey singh', 'honeysingh': 'yo yo honey singh',
+        'diljit': 'diljit dosanjh', 'daljit': 'diljit dosanjh',
+        'sidhu': 'sidhu moose wala', 'moosewala': 'moose wala',
+        'rehman': 'rahman', 'arrahman': 'a r rahman', 'rahman': 'a r rahman',
+        'pritam': 'pritam',
+        'anirudh': 'anirudh ravichander',
+        'tayler': 'taylor', 'swfit': 'swift', 'taylorswift': 'taylor swift',
+        'weekend': 'the weeknd', 'weeknd': 'the weeknd',
+        'sheeran': 'ed sheeran', 'edsheeran': 'ed sheeran', 'sheran': 'ed sheeran',
+        'dualipa': 'dua lipa',
+        'coldply': 'coldplay', 'cold paly': 'coldplay',
+        'eminen': 'eminem', 'emminem': 'eminem',
+        'lofi': 'lo-fi', 'lo fi': 'lo-fi', 'slowed': 'lo-fi',
+        'bolywood': 'bollywood', 'bollywod': 'bollywood', 'bolliwood': 'bollywood',
+        'purane': 'retro', 'purana': 'retro', 'sad': 'sad songs',
+        'qawali': 'qawwali', 'ghazal': 'ghazals', 'punjabi': 'punjabi'
+    };
+
+    function levenshteinDistance(s1, s2) {
+        s1 = s1.toLowerCase();
+        s2 = s2.toLowerCase();
+        const m = s1.length;
+        const n = s2.length;
+        if (m === 0) return n;
+        if (n === 0) return m;
+        const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+        for (let i = 0; i <= m; i++) dp[i][0] = i;
+        for (let j = 0; j <= n; j++) dp[0][j] = j;
+        for (let i = 1; i <= m; i++) {
+            for (let j = 1; j <= n; j++) {
+                const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+                dp[i][j] = Math.min(
+                    dp[i - 1][j] + 1,
+                    dp[i][j - 1] + 1,
+                    dp[i - 1][j - 1] + cost
+                );
+            }
+        }
+        return dp[m][n];
+    }
+
+    function normalizeQueryWithTypoCheck(rawQuery) {
+        const raw = (rawQuery || '').trim();
+        if (!raw) return { normalized: '', wasCorrected: false, original: '' };
+
+        let tokens = raw.toLowerCase().split(/\s+/);
+        let correctedTokens = tokens.map(tok => {
+            if (TYPO_MAP[tok]) return TYPO_MAP[tok];
+            // Check Levenshtein against top target keywords if token length >= 4
+            if (tok.length >= 4) {
+                for (const [typo, fix] of Object.entries(TYPO_MAP)) {
+                    if (levenshteinDistance(tok, typo) <= 1) {
+                        return fix;
+                    }
+                }
+            }
+            return tok;
+        });
+
+        let normalized = correctedTokens.join(' ').replace(/\s+/g, ' ').trim();
+        const wasCorrected = normalized.toLowerCase() !== raw.toLowerCase();
+        return { normalized, wasCorrected, original: raw };
+    }
+
+    // ─── Quick Pick Recommendation Chips ─────────
     const CHIPS = [
         { label: '90s Bollywood', emoji: '🎵' },
         { label: 'Arijit Singh', emoji: '🎤' },
         { label: 'Lo-Fi Chill', emoji: '🌙' },
         { label: 'A.R. Rahman', emoji: '🌟' },
         { label: 'Punjabi Hits', emoji: '🎶' },
+        { label: 'Kishore Kumar', emoji: '📻' },
         { label: 'Taylor Swift', emoji: '✨' },
+        { label: 'Soulful Ghazals', emoji: '🎷' },
+        { label: 'Classic Rock', emoji: '🎸' },
         { label: 'Hip Hop', emoji: '🔥' },
-        { label: 'Soulful Jazz', emoji: '🎷' },
     ];
 
     function renderChips() {
@@ -162,6 +280,7 @@
             el.innerHTML = `<span>${chip.emoji}</span><span>${chip.label}</span>`;
             el.addEventListener('click', () => {
                 searchInput.value = chip.label;
+                btnSearchClear.style.display = 'flex';
                 doLiveSearch(chip.label);
                 saveRecent(chip.label);
             });
@@ -169,39 +288,47 @@
         });
     }
 
-    // ─── Recent searches (localStorage) ──────────
+    // ─── Recent Searches (localStorage) ──────────
     function getRecents() {
         try { return JSON.parse(localStorage.getItem('mrps_recents') || '[]'); } catch { return []; }
     }
     function saveRecent(q) {
-        let r = getRecents().filter(x => x.toLowerCase() !== q.toLowerCase());
-        r.unshift(q);
+        if (!q || !q.trim()) return;
+        const cleanQ = q.trim();
+        let r = getRecents().filter(x => x.toLowerCase() !== cleanQ.toLowerCase());
+        r.unshift(cleanQ);
         r = r.slice(0, 6);
         try { localStorage.setItem('mrps_recents', JSON.stringify(r)); } catch {}
         renderRecents();
     }
     function removeRecent(q) {
-        const r = getRecents().filter(x => x !== q);
+        const r = getRecents().filter(x => x.toLowerCase() !== q.toLowerCase());
         try { localStorage.setItem('mrps_recents', JSON.stringify(r)); } catch {}
         renderRecents();
     }
     function renderRecents() {
         const r = getRecents();
-        if (!r.length) { recentsLabel.style.display = 'none'; searchRecents.innerHTML = ''; return; }
+        if (!r.length) {
+            recentsLabel.style.display = 'none';
+            searchRecents.innerHTML = '';
+            return;
+        }
         recentsLabel.style.display = '';
         searchRecents.innerHTML = '';
         r.forEach(q => {
             const el = document.createElement('div');
             el.className = 'search-recent-item';
             el.innerHTML = `
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.13"/></svg>
-                <span>${q}</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.13"/></svg>
+                <span class="search-suggestion-text">${escapeHtml(q)}</span>
                 <button class="search-recent-remove" title="Remove">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>`;
             el.querySelector('span').addEventListener('click', () => {
                 searchInput.value = q;
+                btnSearchClear.style.display = 'flex';
                 doLiveSearch(q);
+                saveRecent(q);
             });
             el.querySelector('.search-recent-remove').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -211,7 +338,7 @@
         });
     }
 
-    // ─── Open/close dropdown ──────────────────────
+    // ─── Dropdown Controls ─────────────────────────
     function openDropdown() {
         searchBox.classList.add('active');
         searchDropdown.classList.add('open');
@@ -219,14 +346,19 @@
     function closeDropdown() {
         searchBox.classList.remove('active');
         searchDropdown.classList.remove('open');
+        activeNavIdx = -1;
     }
 
     searchInput.addEventListener('focus', () => {
         renderChips();
         renderRecents();
         openDropdown();
-        if (searchInput.value.trim().length >= 2) {
-            showResults(currentSearchResults);
+        const cur = searchInput.value.trim();
+        if (cur.length >= 2) {
+            renderPredictiveSuggestions(cur);
+        } else {
+            searchRecos.style.display = '';
+            searchResultsList.style.display = 'none';
         }
     });
 
@@ -236,19 +368,28 @@
         }
     });
 
-    // ─── Clear button ─────────────────────────────
+    // ─── Input Handling (Typing & Recommendations) ───
     searchInput.addEventListener('input', () => {
         const v = searchInput.value;
         btnSearchClear.style.display = v.length ? 'flex' : 'none';
+        activeNavIdx = -1;
+
         if (!v.trim()) {
             searchResultsList.style.display = 'none';
             searchRecos.style.display = '';
             currentSearchResults = [];
+            clearTimeout(searchDebounce);
             return;
         }
-        // Debounced live search
+
+        // 1. Instant YouTube-style predictive query recommendations
+        renderPredictiveSuggestions(v.trim());
+
+        // 2. Debounced deep live search to Apple iTunes API (320ms)
         clearTimeout(searchDebounce);
-        searchDebounce = setTimeout(() => doLiveSearch(v.trim()), 380);
+        searchDebounce = setTimeout(() => {
+            doLiveSearch(v.trim());
+        }, 320);
     });
 
     if (btnSearchClear) {
@@ -258,38 +399,76 @@
             searchResultsList.style.display = 'none';
             searchRecos.style.display = '';
             currentSearchResults = [];
+            activeNavIdx = -1;
             searchInput.focus();
         });
     }
 
+    // ─── Keyboard Navigation (Arrow Keys + Enter) ───
     searchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const q = searchInput.value.trim();
-            if (q) { doLiveSearch(q); saveRecent(q); }
+        const items = searchDropdown.querySelectorAll('.search-result-item, .search-query-suggestion, .search-recent-item, .search-hero-card');
+        if (!items.length) {
+            if (e.key === 'Enter') {
+                const q = searchInput.value.trim();
+                if (q) { doLiveSearch(q); saveRecent(q); }
+            }
+            return;
         }
-        if (e.key === 'Escape') closeDropdown();
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeNavIdx = (activeNavIdx + 1) % items.length;
+            highlightActiveItem(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeNavIdx = (activeNavIdx - 1 + items.length) % items.length;
+            highlightActiveItem(items);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeNavIdx >= 0 && items[activeNavIdx]) {
+                items[activeNavIdx].click();
+            } else {
+                const q = searchInput.value.trim();
+                if (q) { doLiveSearch(q); saveRecent(q); }
+            }
+        } else if (e.key === 'Escape') {
+            closeDropdown();
+        }
     });
 
-    // ─── Typo-tolerant query normalization ───────
-    function normalizeQuery(q) {
-        // common music typos / Indian English variations
-        const fixes = {
-            'arijt': 'arijit', 'arjit': 'arijit', 'arjith': 'arijit',
-            'rahman': 'a r rahman', 'ar rahman': 'a r rahman',
-            'lofi': 'lo-fi', 'lofI': 'lo-fi',
-            'bolywood': 'bollywood', 'bollywod': 'bollywood',
-            'tayler': 'taylor', 'swfit': 'swift',
-            'shakria': 'shakira', 'eminen': 'eminem',
-            'beatles': 'the beatles', 'coldply': 'coldplay',
-        };
-        let norm = q.toLowerCase().trim();
-        Object.entries(fixes).forEach(([typo, fix]) => {
-            norm = norm.replace(new RegExp(typo, 'gi'), fix);
+    function highlightActiveItem(items) {
+        items.forEach((it, idx) => {
+            it.classList.toggle('is-selected', idx === activeNavIdx);
+            if (idx === activeNavIdx) {
+                it.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         });
-        return norm;
     }
 
-    // ─── Format ms to m:ss ───────────────────────
+    // ─── Helpers: Escape HTML & Highlight Matching Text ───
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function highlightMatches(text, query) {
+        if (!query || !text) return escapeHtml(text);
+        const tokens = query.toLowerCase().split(/\s+/).filter(t => t.length >= 2);
+        if (!tokens.length) return escapeHtml(text);
+        tokens.sort((a, b) => b.length - a.length);
+        const escaped = tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        try {
+            const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+            return escapeHtml(text).replace(regex, '<mark class="search-hl">$1</mark>');
+        } catch {
+            return escapeHtml(text);
+        }
+    }
+
     function formatTime(ms) {
         if (!ms) return '';
         const s = Math.floor(ms / 1000);
@@ -297,68 +476,104 @@
         return `${m}:${(s % 60).toString().padStart(2, '0')}`;
     }
 
-    // ─── Quality scoring for results ─────────────
+    // ─── YouTube-Style Predictive Query Recommendations ─────────
+    function renderPredictiveSuggestions(query) {
+        const qLower = query.toLowerCase().trim();
+        if (!qLower) return;
+
+        // Find matches in POPULAR_RECOMMENDATIONS
+        const matches = POPULAR_RECOMMENDATIONS.filter(item => {
+            return item.query.toLowerCase().includes(qLower);
+        }).slice(0, 5);
+
+        // Dynamically add contextual expansions
+        const suggestions = [...matches];
+        if (!suggestions.some(s => s.query.toLowerCase() === `${qLower} songs`)) {
+            suggestions.push({ query: `${query} songs`, category: 'YouTube Suggestion' });
+        }
+        if (!suggestions.some(s => s.query.toLowerCase() === `${qLower} romantic`)) {
+            suggestions.push({ query: `${query} romantic hits`, category: 'Vibe' });
+        }
+
+        // If results list is empty or searching, show instant suggestions
+        if (searchResultsList.style.display === 'none' || searchResultsList.innerHTML === '') {
+            searchResultsList.style.display = '';
+            searchRecos.style.display = 'none';
+            searchResultsList.innerHTML = '';
+
+            const header = document.createElement('div');
+            header.className = 'search-result-header';
+            header.innerHTML = `<span class="search-result-header-text">Suggestions</span>`;
+            searchResultsList.appendChild(header);
+
+            suggestions.slice(0, 6).forEach(s => {
+                const el = document.createElement('div');
+                el.className = 'search-query-suggestion';
+                el.innerHTML = `
+                    <svg class="search-suggestion-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <span class="search-suggestion-text">${highlightMatches(s.query, query)}</span>
+                    <svg class="search-suggestion-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>`;
+                el.addEventListener('click', () => {
+                    searchInput.value = s.query;
+                    btnSearchClear.style.display = 'flex';
+                    doLiveSearch(s.query);
+                    saveRecent(s.query);
+                });
+                searchResultsList.appendChild(el);
+            });
+        }
+    }
+
+    // ─── Quality Scoring for Results ─────────────
     function scoreResult(r, q) {
         let score = 0;
         const title = (r.trackName || '').toLowerCase();
         const artist = (r.artistName || '').toLowerCase();
         const query = q.toLowerCase();
-        if (title.startsWith(query)) score += 20;
-        if (title.includes(query)) score += 10;
-        if (artist.includes(query)) score += 8;
+        if (title.startsWith(query)) score += 30;
+        if (title.includes(query)) score += 15;
+        if (artist.startsWith(query)) score += 25;
+        if (artist.includes(query)) score += 12;
         if (r.trackCount) score += Math.min(r.trackCount / 100, 3);
-        // Penalize very short durations (likely skits/intros)
-        if (r.trackTimeMillis && r.trackTimeMillis < 60000) score -= 8;
-        // Boost verified/popular artists
-        if (r.primaryGenreName !== 'Music') score -= 2;
+        // Penalize very short tracks (previews, skits)
+        if (r.trackTimeMillis && r.trackTimeMillis < 60000) score -= 10;
         return score;
     }
 
-    // ─── Live search via iTunes API ──────────────
+    // ─── Live Search via Apple iTunes API + Typo Engine ──────────
     async function doLiveSearch(rawQuery) {
-        const q = normalizeQuery(rawQuery);
-        if (!q) return;
+        const { normalized, wasCorrected, original } = normalizeQueryWithTypoCheck(rawQuery);
+        const searchQ = normalized || rawQuery.trim();
+        if (!searchQ) return;
+        lastExecutedQuery = rawQuery;
 
-        // Show spinner
         searchSpinner.style.display = 'flex';
         searchRecos.style.display = 'none';
         searchResultsList.style.display = '';
-        searchResultsList.innerHTML = '';
 
         try {
-            // Search with higher limit then filter+score for quality
-            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&limit=50&media=music&entity=song`;
+            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(searchQ)}&limit=45&media=music&entity=song`;
             const res = await fetch(url);
             const json = await res.json();
 
             searchSpinner.style.display = 'none';
 
             if (!json.results || !json.results.length) {
+                // If corrected query returned 0, fallback to raw query
+                if (wasCorrected) {
+                    const fallbackUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(rawQuery)}&limit=30&media=music&entity=song`;
+                    const fbRes = await fetch(fallbackUrl);
+                    const fbJson = await fbRes.json();
+                    if (fbJson.results && fbJson.results.length) {
+                        renderResults(fbJson.results, rawQuery, false, '');
+                        return;
+                    }
+                }
                 showNoResults(rawQuery);
                 return;
             }
 
-            // Score & deduplicate by title+artist
-            const seen = new Set();
-            const scored = json.results
-                .map(r => ({ r, score: scoreResult(r, q) }))
-                .filter(({ r }) => {
-                    const key = `${(r.trackName||'').toLowerCase()}|${(r.artistName||'').toLowerCase()}`;
-                    if (seen.has(key)) return false;
-                    seen.add(key);
-                    return true;
-                })
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 15)
-                .map(({ r }) => ({
-                    title: r.trackName || 'Unknown',
-                    artist: r.artistName || '',
-                    thumbnail: (r.artworkUrl100 || '').replace('100x100bb', '400x400bb'),
-                    duration: formatTime(r.trackTimeMillis),
-                }));
-
-            currentSearchResults = scored;
-            showResults(scored, rawQuery);
+            renderResults(json.results, searchQ, wasCorrected, original);
 
         } catch (err) {
             searchSpinner.style.display = 'none';
@@ -369,45 +584,124 @@
         }
     }
 
-    // ─── Render results list ──────────────────────
-    function showResults(results, query = '') {
+    // ─── Render High-Readability YouTube-Grade Results ───────────
+    function renderResults(rawResults, activeQuery, wasCorrected, originalQuery) {
         searchResultsList.style.display = '';
         searchRecos.style.display = 'none';
         searchResultsList.innerHTML = '';
+        activeNavIdx = -1;
 
-        if (!results.length) { showNoResults(query); return; }
+        // 1. Deduplicate & score tracks
+        const seen = new Set();
+        const scored = rawResults
+            .map(r => ({ r, score: scoreResult(r, activeQuery) }))
+            .filter(({ r }) => {
+                if (!r.trackName || !r.artworkUrl100) return false;
+                const key = `${(r.trackName||'').toLowerCase()}|${(r.artistName||'').toLowerCase()}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 15)
+            .map(({ r }) => ({
+                title: r.trackName || 'Unknown',
+                artist: r.artistName || '',
+                album: r.collectionName || '',
+                thumbnail: (r.artworkUrl100 || '').replace('100x100bb', '400x400bb'),
+                appleArt: (r.artworkUrl100 || '').replace('100x100bb', '1000x1000bb'),
+                duration: formatTime(r.trackTimeMillis),
+            }));
 
+        currentSearchResults = scored;
+
+        if (!scored.length) {
+            showNoResults(activeQuery);
+            return;
+        }
+
+        // 2. YouTube-Style Typo Correction Banner ("Showing results for...")
+        if (wasCorrected && originalQuery) {
+            const banner = document.createElement('div');
+            banner.className = 'search-correction-banner';
+            banner.innerHTML = `
+                <span class="search-correction-text">Showing results for <strong>${escapeHtml(activeQuery)}</strong></span>
+                <button class="search-search-instead">Search instead for "${escapeHtml(originalQuery)}"?</button>`;
+            banner.querySelector('.search-search-instead').addEventListener('click', () => {
+                searchInput.value = originalQuery;
+                doLiveSearch(originalQuery);
+            });
+            searchResultsList.appendChild(banner);
+        }
+
+        // 3. YouTube Music "Top Result" Hero Card for Featured Artist
+        const topArtist = POPULAR_RECOMMENDATIONS.find(item => 
+            item.category === 'Artist' && 
+            item.avatar && 
+            activeQuery.toLowerCase().includes(item.query.toLowerCase())
+        );
+
+        if (topArtist) {
+            const hero = document.createElement('div');
+            hero.className = 'search-hero-card';
+            hero.innerHTML = `
+                <img class="search-hero-avatar" src="${topArtist.avatar}" alt="${topArtist.query}">
+                <div class="search-hero-info">
+                    <div class="search-hero-title">
+                        <span>${escapeHtml(topArtist.query)}</span>
+                        <span class="search-hero-badge">Verified Artist</span>
+                    </div>
+                    <div class="search-hero-sub">Top Result • Popular on YouTube & Apple Music</div>
+                </div>
+                <button class="search-hero-play-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    <span>Play Top Hits</span>
+                </button>`;
+            hero.addEventListener('click', () => {
+                loadSearchResults(scored, 0);
+                saveRecent(activeQuery);
+                closeDropdown();
+            });
+            searchResultsList.appendChild(hero);
+        }
+
+        // 4. Section Header with "Play All"
         const header = document.createElement('div');
         header.className = 'search-result-header';
         header.innerHTML = `
-            <span class="search-result-header-text">Results</span>
+            <span class="search-result-header-text">${scored.length} Songs Found</span>
             <button class="search-result-play-all" id="sri-play-all">Play All</button>`;
         searchResultsList.appendChild(header);
 
         header.querySelector('#sri-play-all').addEventListener('click', () => {
-            loadSearchResults(results, 0);
+            loadSearchResults(scored, 0);
+            saveRecent(activeQuery);
             closeDropdown();
         });
 
-        results.forEach((t, i) => {
+        // 5. High-Readability Track List
+        scored.forEach((t, i) => {
             const el = document.createElement('div');
             el.className = 'search-result-item';
             el.innerHTML = `
-                <img class="sri-thumb" src="${t.thumbnail}" alt="" onerror="this.style.opacity=0">
+                <div class="sri-thumb-wrap">
+                    <img class="sri-thumb" src="${t.thumbnail}" alt="" onerror="this.onerror=null;this.src='assets/icons/icon-192.png'">
+                </div>
                 <div class="sri-info">
-                    <div class="sri-title">${t.title}</div>
-                    <div class="sri-artist">${t.artist}</div>
+                    <div class="sri-title">${highlightMatches(t.title, activeQuery)}</div>
+                    <div class="sri-meta-line">
+                        <span class="sri-badge">Song</span>
+                        <span class="sri-artist">${highlightMatches(t.artist, activeQuery)}</span>
+                    </div>
                 </div>
                 ${t.duration ? `<span class="sri-dur">${t.duration}</span>` : ''}
                 <div class="sri-play-btn">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                 </div>`;
             el.addEventListener('click', () => {
-                loadSearchResults(results, i);
-                if (query) saveRecent(query);
+                loadSearchResults(scored, i);
+                saveRecent(activeQuery);
                 closeDropdown();
-                searchInput.value = '';
-                btnSearchClear.style.display = 'none';
             });
             searchResultsList.appendChild(el);
         });
@@ -415,18 +709,18 @@
 
     function showNoResults(query) {
         searchResultsList.innerHTML = `<div class="search-empty">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <p>No results for "${query}"</p>
-            <small>Try a different spelling or artist name</small></div>`;
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <p>No results found for "${escapeHtml(query)}"</p>
+            <small>Check for spelling errors or try artist names like Arijit Singh, Kishore Kumar, Taylor Swift</small></div>`;
     }
 
-    // ─── Load search results into player ─────────
+    // ─── Load Search Results into Player ─────────
     function loadSearchResults(tracks, startIdx) {
         const searchPl = {
-            title: `Search Results`,
+            title: `Search: ${lastExecutedQuery || 'Results'}`,
             tracks: tracks
         };
-        const existingIdx = data.playlists.findIndex(p => p.title === 'Search Results');
+        const existingIdx = data.playlists.findIndex(p => p.title.startsWith('Search:'));
         if (existingIdx >= 0) {
             data.playlists[existingIdx] = searchPl;
             renderPlaylistNav();
@@ -437,7 +731,7 @@
             currentPl = data.playlists[0];
         }
         currentIdx = startIdx;
-        mobilePlName.textContent = 'Search Results';
+        mobilePlName.textContent = searchPl.title;
         renderQueue();
         syncMeta();
         if (playerReady) playTrack(startIdx);
