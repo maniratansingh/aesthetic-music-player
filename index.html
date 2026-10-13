@@ -164,5 +164,14 @@
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="assets/js/shader.js?v=80"></script>
     <script src="assets/js/app.js?v=80"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch((err) => {
+                    console.warn('ServiceWorker registration failed:', err);
+                });
+            });
+        }
+    </script>
 </body>
 </html>
