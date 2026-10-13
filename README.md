@@ -164,7 +164,7 @@ A clean, standalone upload folder and ZIP are pre-packaged:
 4. Go to **Custom domains** → enter `music.mrps.in`.
 
 #### Method 2: Git Integration
-1. Connect repository `maniratansingh/aesthetic-music-player` and select branch **`test`**.
+1. Connect repository `maniratansingh/aesthetic-music-player` and select branch **`beta`** (or **`test`**).
 2. **Build command:** *(leave empty)*
 3. **Build output directory:** `/` *(or leave empty)*
 4. Go to **Custom domains** → enter `music.mrps.in`.
