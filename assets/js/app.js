@@ -540,7 +540,159 @@
         return score;
     }
 
-    // ─── Live Search via Apple iTunes API + Typo Engine ──────────
+    // ─── JSONP Apple Music Fetcher (Immune to CORS & Adblockers) ─
+    function fetchItunesJsonp(query, limit = 40) {
+        return new Promise((resolve, reject) => {
+            const callbackName = 'itunes_cb_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+            const script = document.createElement('script');
+            let timer = null;
+
+            window[callbackName] = function (data) {
+                cleanup();
+                resolve(data);
+            };
+
+            function cleanup() {
+                if (timer) clearTimeout(timer);
+                delete window[callbackName];
+                if (script && script.parentNode) script.parentNode.removeChild(script);
+            }
+
+            timer = setTimeout(() => {
+                cleanup();
+                reject(new Error('JSONP timeout'));
+            }, 3500);
+
+            script.onerror = function () {
+                cleanup();
+                reject(new Error('JSONP network error'));
+            };
+
+            const encodedQ = encodeURIComponent(query);
+            script.src = `https://itunes.apple.com/search?term=${encodedQ}&media=music&entity=song&limit=${limit}&callback=${callbackName}`;
+            document.head.appendChild(script);
+        });
+    }
+
+    // ─── Local Music Catalog Search Fallback (Safety Net) ────────
+    function parseDurationToMs(durStr) {
+        if (!durStr) return 180000;
+        const parts = durStr.split(':').map(Number);
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            return (parts[0] * 60 + parts[1]) * 1000;
+        } else if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+            return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+        }
+        return 180000;
+    }
+
+    function searchLocalCatalog(query) {
+        if (!query) return [];
+        const qLower = query.toLowerCase().trim();
+        const tokens = qLower.split(/\s+/).filter(Boolean);
+        const results = [];
+        const seen = new Set();
+
+        const playlists = (window.RoadtripData && Array.isArray(window.RoadtripData.playlists))
+            ? window.RoadtripData.playlists
+            : (data && Array.isArray(data.playlists) ? data.playlists : []);
+
+        playlists.forEach(pl => {
+            if (Array.isArray(pl.tracks)) {
+                pl.tracks.forEach(track => {
+                    if (!track || !track.title) return;
+                    const tLower = track.title.toLowerCase();
+                    const aLower = (track.artist || '').toLowerCase();
+                    const combined = `${tLower} ${aLower}`;
+
+                    let match = false;
+                    if (combined.includes(qLower)) {
+                        match = true;
+                    } else if (tokens.length > 0 && tokens.every(tok => combined.includes(tok))) {
+                        match = true;
+                    }
+
+                    if (match) {
+                        const key = `${track.title}|${track.artist || ''}`;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            results.push({
+                                trackName: track.title,
+                                artistName: track.artist || 'Featured Artist',
+                                collectionName: pl.title || '',
+                                artworkUrl100: track.thumbnail || 'assets/icons/icon-192.png',
+                                trackTimeMillis: parseDurationToMs(track.duration),
+                                videoId: track.videoId || null
+                            });
+                        }
+                    }
+                });
+            }
+        });
+
+        return results.slice(0, 30);
+    }
+
+    // ─── 4-Tier Search Fallback Engine ───────────────────────────
+    async function fetchMusicMultiSource(query) {
+        const q = (query || '').trim();
+        if (!q) return [];
+
+        // Tier 1: Direct iTunes Fetch (Fastest)
+        try {
+            const controller = new AbortController();
+            const tid = setTimeout(() => controller.abort(), 3200);
+            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&limit=45&media=music&entity=song`;
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(tid);
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.results && json.results.length) {
+                    return json.results;
+                }
+            }
+        } catch (e) {
+            // Direct fetch failed or blocked
+        }
+
+        // Tier 2: Apple JSONP via dynamic <script> (Bypasses CORS & adblockers)
+        try {
+            const json = await fetchItunesJsonp(q, 40);
+            if (json && json.results && json.results.length) {
+                return json.results;
+            }
+        } catch (e) {
+            // JSONP failed or timed out
+        }
+
+        // Tier 3: High-speed CORS Proxy (AllOrigins)
+        try {
+            const controller = new AbortController();
+            const tid = setTimeout(() => controller.abort(), 3500);
+            const target = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&limit=35&media=music&entity=song`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`;
+            const res = await fetch(proxyUrl, { signal: controller.signal });
+            clearTimeout(tid);
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.results && json.results.length) {
+                    return json.results;
+                }
+            }
+        } catch (e) {
+            // Proxy failed
+        }
+
+        // Tier 4: Local catalog search (Offline & safety net)
+        const localMatches = searchLocalCatalog(q);
+        if (localMatches && localMatches.length) {
+            return localMatches;
+        }
+
+        return [];
+    }
+
+    // ─── Live Search via Typo Engine + Multi-Tier Search ─────────
     async function doLiveSearch(rawQuery) {
         const { normalized, wasCorrected, original } = normalizeQueryWithTypoCheck(rawQuery);
         const searchQ = normalized || rawQuery.trim();
@@ -552,35 +704,30 @@
         searchResultsList.style.display = '';
 
         try {
-            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(searchQ)}&limit=45&media=music&entity=song`;
-            const res = await fetch(url);
-            const json = await res.json();
+            let results = await fetchMusicMultiSource(searchQ);
+
+            // If corrected query returned 0, try raw query
+            if ((!results || !results.length) && wasCorrected) {
+                results = await fetchMusicMultiSource(rawQuery);
+            }
 
             searchSpinner.style.display = 'none';
 
-            if (!json.results || !json.results.length) {
-                // If corrected query returned 0, fallback to raw query
-                if (wasCorrected) {
-                    const fallbackUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(rawQuery)}&limit=30&media=music&entity=song`;
-                    const fbRes = await fetch(fallbackUrl);
-                    const fbJson = await fbRes.json();
-                    if (fbJson.results && fbJson.results.length) {
-                        renderResults(fbJson.results, rawQuery, false, '');
-                        return;
-                    }
-                }
+            if (!results || !results.length) {
                 showNoResults(rawQuery);
                 return;
             }
 
-            renderResults(json.results, searchQ, wasCorrected, original);
-
+            renderResults(results, searchQ, wasCorrected, original);
         } catch (err) {
             searchSpinner.style.display = 'none';
-            console.error('Search error', err);
-            searchResultsList.innerHTML = `<div class="search-empty">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <p>Search unavailable</p><small>Check your internet connection</small></div>`;
+            console.error('Search error, using local fallback:', err);
+            const local = searchLocalCatalog(rawQuery);
+            if (local && local.length) {
+                renderResults(local, rawQuery, false, '');
+            } else {
+                showNoResults(rawQuery);
+            }
         }
     }
 
@@ -596,22 +743,28 @@
         const scored = rawResults
             .map(r => ({ r, score: scoreResult(r, activeQuery) }))
             .filter(({ r }) => {
-                if (!r.trackName || !r.artworkUrl100) return false;
+                if (!r.trackName) return false;
                 const key = `${(r.trackName||'').toLowerCase()}|${(r.artistName||'').toLowerCase()}`;
                 if (seen.has(key)) return false;
                 seen.add(key);
                 return true;
             })
             .sort((a, b) => b.score - a.score)
-            .slice(0, 15)
-            .map(({ r }) => ({
-                title: r.trackName || 'Unknown',
-                artist: r.artistName || '',
-                album: r.collectionName || '',
-                thumbnail: (r.artworkUrl100 || '').replace('100x100bb', '400x400bb'),
-                appleArt: (r.artworkUrl100 || '').replace('100x100bb', '1000x1000bb'),
-                duration: formatTime(r.trackTimeMillis),
-            }));
+            .slice(0, 20)
+            .map(({ r }) => {
+                const rawArt = r.artworkUrl100 || '';
+                const thumb = rawArt ? rawArt.replace('100x100bb', '300x300bb') : 'assets/icons/icon-192.png';
+                const appleArt = rawArt ? rawArt.replace('100x100bb', '1000x1000bb') : thumb;
+                return {
+                    title: r.trackName || 'Unknown',
+                    artist: r.artistName || 'Featured Artist',
+                    album: r.collectionName || '',
+                    thumbnail: thumb,
+                    appleArt: appleArt,
+                    duration: formatTime(r.trackTimeMillis),
+                    videoId: r.videoId || null
+                };
+            });
 
         currentSearchResults = scored;
 
@@ -679,7 +832,7 @@
             closeDropdown();
         });
 
-        // 5. High-Readability Track List
+        // 5. High-Readability Track List with Full Details
         scored.forEach((t, i) => {
             const el = document.createElement('div');
             el.className = 'search-result-item';
@@ -692,10 +845,11 @@
                     <div class="sri-meta-line">
                         <span class="sri-badge">Song</span>
                         <span class="sri-artist">${highlightMatches(t.artist, activeQuery)}</span>
+                        ${t.album ? `<span class="sri-album">• ${escapeHtml(t.album)}</span>` : ''}
                     </div>
                 </div>
                 ${t.duration ? `<span class="sri-dur">${t.duration}</span>` : ''}
-                <div class="sri-play-btn">
+                <div class="sri-play-btn" title="Play">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                 </div>`;
             el.addEventListener('click', () => {
@@ -923,60 +1077,94 @@
         if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // ─── Playback ────────────────────────────────
+    // ─── Playback & YouTube Audio Engine ──────────
+    let pendingTrackIdx    = null;
+    let consecutiveErrors   = 0;
+
     async function playTrack(idx) {
-        if (!ytPlayer || !playerReady || !currentPl) return;
+        if (!currentPl) return;
         currentIdx = idx;
         const t = currentPl.tracks[idx];
+        if (!t) return;
         
         updateProgress(0, 0);
         syncMeta();
         setPlaying(true);
 
-        if (t && t.videoId) {
+        if (!ytPlayer || !playerReady) {
+            pendingTrackIdx = idx;
+            return;
+        }
+        pendingTrackIdx = null;
+
+        // 1. Direct verified videoId
+        if (t.videoId) {
             ytPlayer.loadVideoById(t.videoId);
             ytPlayer.playVideo();
-        } else if (currentPl.youtubeListId) {
+            return;
+        }
+
+        // 2. Playlist list ID
+        if (currentPl.youtubeListId) {
             ytPlayer.loadPlaylist({ listType: 'playlist', list: currentPl.youtubeListId, index: idx });
             ytPlayer.playVideo();
-        } else {
-            // Missing videoId (from iTunes search)
-            try {
-                const q = encodeURIComponent(`${t.title} ${t.artist} audio`);
-                // Use public Invidious instances with robust fallbacks
-                const instances = [
-                    'https://invidious.f5.si',
-                    'https://yt.chocolatemoo53.com',
-                    'https://invidious.nerdvpn.de'
-                ];
-                
-                let foundVid = null;
-                for (const url of instances) {
-                    try {
-                        const res = await fetch(`${url}/api/v1/search?q=${q}`);
-                        if (!res.ok) continue;
-                        const data = await res.json();
-                        if (data && data.length > 0 && data[0].videoId) {
-                            foundVid = data[0].videoId;
-                            break; // Stop at first successful API response!
-                        }
-                    } catch (e) {
-                        console.warn(`Instance ${url} failed, trying next...`);
-                    }
-                }
-                
-                if (foundVid) {
-                    t.videoId = foundVid; // Cache it permanently for this session!
-                    ytPlayer.loadVideoById(t.videoId);
-                    ytPlayer.playVideo();
-                } else {
-                    console.error("No video found on any instance");
-                    setTimeout(() => playTrack((idx + 1) % currentPl.tracks.length), 1000);
-                }
-            } catch (err) {
-                console.error("Search API failed", err);
-                setTimeout(() => playTrack((idx + 1) % currentPl.tracks.length), 1000);
+            return;
+        }
+
+        // 3. Search Track Audio Resolution (No skip loops, no repeated ads)
+        const cleanT = clean(t.title);
+        const cleanA = (t.artist || '').split('&')[0].split(',')[0].trim();
+        const searchQ = `${cleanT} ${cleanA} audio`.trim();
+        const cacheKey = `mrps_vid_${cleanT}_${cleanA}`.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+        // Check localStorage cache
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                t.videoId = cached;
+                ytPlayer.loadVideoById(cached);
+                ytPlayer.playVideo();
+                return;
             }
+        } catch (e) {}
+
+        // Fast endpoint check with 1.8s timeout
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 1800);
+            const instances = [
+                'https://invidious.f5.si',
+                'https://yt.chocolatemoo53.com'
+            ];
+            let foundVid = null;
+            for (const url of instances) {
+                try {
+                    const res = await fetch(`${url}/api/v1/search?q=${encodeURIComponent(searchQ)}`, { signal: controller.signal });
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    if (data && data.length > 0 && data[0].videoId) {
+                        foundVid = data[0].videoId;
+                        break;
+                    }
+                } catch (e) {}
+            }
+            clearTimeout(timeoutId);
+
+            if (foundVid) {
+                t.videoId = foundVid;
+                try { localStorage.setItem(cacheKey, foundVid); } catch (e) {}
+                ytPlayer.loadVideoById(foundVid);
+                ytPlayer.playVideo();
+                return;
+            }
+        } catch (err) {}
+
+        // Guaranteed fallback: Native YouTube IFrame Search (runs inside player without CORS errors)
+        try {
+            ytPlayer.loadPlaylist({ listType: 'search', list: searchQ, index: 0 });
+            ytPlayer.playVideo();
+        } catch (e) {
+            console.error('Playback could not be initiated:', e);
         }
     }
 
@@ -1114,31 +1302,85 @@
         }, { passive: true });
     }
 
-    // ─── YouTube IFrame API ──────────────────────
+    // ─── YouTube IFrame API (Ad-Mitigated & Error 150 Safe) ──────
     window.onYouTubeIframeAPIReady = function () {
         ytPlayer = new YT.Player('yt-player', {
-            height: '1', width: '1',
-            playerVars: { playsinline: 1, controls: 0, disablekb: 1, fs: 0, rel: 0 },
+            height: '240',
+            width: '320',
+            host: 'https://www.youtube-nocookie.com',
+            playerVars: {
+                playsinline: 1,
+                controls: 0,
+                disablekb: 1,
+                fs: 0,
+                rel: 0,
+                modestbranding: 1,
+                iv_load_policy: 3,
+                origin: window.location.origin,
+                enablejsapi: 1
+            },
             events: {
-                onReady: () => { playerReady = true; },
+                onReady: () => {
+                    playerReady = true;
+                    if (pendingTrackIdx !== null) {
+                        const idx = pendingTrackIdx;
+                        pendingTrackIdx = null;
+                        playTrack(idx);
+                    }
+                },
                 onStateChange: onState,
-                onError: () => {
-                    // Skip broken track
-                    setTimeout(() => {
-                        if (!currentPl) return;
-                        playTrack((currentIdx + 1) % currentPl.tracks.length);
-                    }, 1200);
-                }
+                onError: onPlayerError
             }
         });
     };
 
+    function onPlayerError(e) {
+        console.warn('YouTube Player error code:', e && e.data);
+        consecutiveErrors++;
+        if (consecutiveErrors >= 3) {
+            console.error('Multiple consecutive playback errors. Pausing to stop ad loop.');
+            setPlaying(false);
+            return;
+        }
+
+        const t = currentPl && currentPl.tracks[currentIdx];
+        if (t) {
+            const cleanT = clean(t.title);
+            const cleanA = (t.artist || '').split('&')[0].split(',')[0].trim();
+            try {
+                ytPlayer.loadPlaylist({ listType: 'search', list: `${cleanT} ${cleanA} audio`, index: 0 });
+                ytPlayer.playVideo();
+                return;
+            } catch (err) {}
+        }
+
+        setTimeout(() => {
+            if (!currentPl) return;
+            playTrack((currentIdx + 1) % currentPl.tracks.length);
+        }, 1500);
+    }
+
     function onState(e) {
         if (e.data === YT.PlayerState.PLAYING) {
+            consecutiveErrors = 0;
             setPlaying(true);
             startProgressTicker();
-            const curTrack = currentPl && currentPl.tracks[currentIdx];
+
+            // Detect if an ad is playing (short duration <= 35s or missing author)
+            const dur = ytPlayer.getDuration() || 0;
             const vd = ytPlayer.getVideoData();
+            const isAd = (dur > 0 && dur <= 35 && (!vd || !vd.author || vd.author === ''));
+
+            if (isAd) {
+                // Accelerate ad to 2x speed to get through it fast
+                try { ytPlayer.setPlaybackRate(2); } catch (err) {}
+                try { ytPlayer.seekTo(dur, true); } catch (err) {}
+            } else {
+                // Ensure standard speed for real music
+                try { ytPlayer.setPlaybackRate(1); } catch (err) {}
+            }
+
+            const curTrack = currentPl && currentPl.tracks[currentIdx];
             if (vd && vd.title) {
                 // Preserve high-res artwork; only fallback to YouTube if no artwork exists
                 if ((!curTrack || !curTrack.thumbnail) && vd.video_id) {
